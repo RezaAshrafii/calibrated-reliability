@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pandas as pd
@@ -10,8 +11,12 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
-ALLOWED_FEATURE_PREFIXES = ("sensor_", "op_setting_")
-ALLOWED_FEATURES = {"cycle", "cycle_index"}
+from calibrated_reliability.data.loader import OP_SETTING_COLUMNS, SENSOR_COLUMNS
+
+ALLOWED_BASE_FEATURES = frozenset(["cycle", "cycle_index", *OP_SETTING_COLUMNS, *SENSOR_COLUMNS])
+DERIVED_SENSOR_PATTERN = re.compile(
+    r"^sensor_(?:[1-9]|1[0-9]|2[01])_(?:delta_1|rolling_(?:mean|std|slope)_[1-9][0-9]*)$"
+)
 
 
 class RegimeAwareScaler(BaseEstimator, TransformerMixin):  # type: ignore[misc]
@@ -27,23 +32,20 @@ class RegimeAwareScaler(BaseEstimator, TransformerMixin):  # type: ignore[misc]
         del y
         self._validate_input(X)
         self._global_only = False
-        unexpected = {
-            column
-            for column in X.columns
-            if column != "engine_id"
-            and column not in ALLOWED_FEATURES
-            and not column.startswith(ALLOWED_FEATURE_PREFIXES)
-        }
+        self.fallback_reason_: str | None = None
+        unexpected = self._unexpected_columns(X)
         if unexpected:
             raise ValueError(f"Only approved feature columns are allowed: {sorted(unexpected)}")
+        self.feature_names_in_ = list(X.columns)
         self.feature_columns_ = [column for column in X.columns if column != "engine_id"]
         if not self.feature_columns_:
             raise ValueError("No model features remain after removing engine_id")
         settings = X[["op_setting_1", "op_setting_2", "op_setting_3"]].astype("float64")
         self.setting_scaler_ = StandardScaler().fit(settings)
         scaled_settings = self.setting_scaler_.transform(settings)
-        if len(pd.DataFrame(scaled_settings).drop_duplicates()) < 2:
-            self._fit_global(X)
+        distinct_settings = len(pd.DataFrame(scaled_settings).drop_duplicates())
+        if distinct_settings < 2:
+            self._fit_global(X, reason="single_distinct_setting")
             return self
         maximum = min(6, len(X) - 1)
         if maximum < 2:
@@ -58,6 +60,8 @@ class RegimeAwareScaler(BaseEstimator, TransformerMixin):  # type: ignore[misc]
         scores: dict[int, float] = {}
         for candidate in candidates:
             assert candidate is not None
+            if candidate > distinct_settings:
+                continue
             model = KMeans(n_clusters=candidate, random_state=self.random_state, n_init=10).fit(
                 scaled_settings
             )
@@ -65,7 +69,7 @@ class RegimeAwareScaler(BaseEstimator, TransformerMixin):  # type: ignore[misc]
                 continue
             scores[candidate] = float(silhouette_score(scaled_settings, model.labels_))
         if not scores:
-            self._fit_global(X)
+            self._fit_global(X, reason="no_valid_clustering")
             return self
         self.n_regimes_ = max(scores, key=lambda key: scores[key])
         self.clusterer_ = KMeans(
@@ -81,12 +85,13 @@ class RegimeAwareScaler(BaseEstimator, TransformerMixin):  # type: ignore[misc]
         self._fitted = True
         return self
 
-    def _fit_global(self, X: pd.DataFrame) -> None:
+    def _fit_global(self, X: pd.DataFrame, reason: str) -> None:
         """Fit a global scaler for one-regime or invalid-cluster data."""
         self.global_scaler_ = StandardScaler().fit(X[self.feature_columns_])
         self.n_regimes_ = 1
         self.scalers_ = {}
         self._global_only = True
+        self.fallback_reason_ = reason
         self._fitted = True
         self.feature_names_out_ = list(self.feature_columns_)
 
@@ -95,6 +100,16 @@ class RegimeAwareScaler(BaseEstimator, TransformerMixin):  # type: ignore[misc]
         if not self._fitted:
             raise RuntimeError("RegimeAwareScaler must be fitted before transform")
         self._validate_input(X)
+        unexpected = self._unexpected_columns(X)
+        if unexpected:
+            raise ValueError(f"Only approved feature columns are allowed: {sorted(unexpected)}")
+        missing = set(self.feature_names_in_).difference(X.columns)
+        extra = set(X.columns).difference(self.feature_names_in_)
+        if missing or extra:
+            raise ValueError(
+                "Feature schema differs from fit; "
+                f"missing={sorted(missing)}, extra={sorted(extra)}"
+            )
         values = X[self.feature_columns_].astype("float64")
         if getattr(self, "_global_only", False):
             return pd.DataFrame(
@@ -116,10 +131,23 @@ class RegimeAwareScaler(BaseEstimator, TransformerMixin):  # type: ignore[misc]
     @staticmethod
     def _validate_input(X: pd.DataFrame) -> None:
         """Validate regime settings and numeric feature columns."""
-        required = {"op_setting_1", "op_setting_2", "op_setting_3"}
+        if not all(isinstance(column, str) for column in X.columns):
+            raise ValueError("All feature names must be strings")
+        required = set(OP_SETTING_COLUMNS)
         if not required.issubset(X.columns):
             raise ValueError(
                 f"Missing operating settings: {sorted(required.difference(X.columns))}"
             )
         if not all(pd.api.types.is_numeric_dtype(X[column]) for column in X.columns):
             raise ValueError("All scaling features must be numeric")
+
+    @staticmethod
+    def _unexpected_columns(X: pd.DataFrame) -> set[str]:
+        """Return columns outside the exact C-MAPSS feature contract."""
+        return {
+            column
+            for column in X.columns
+            if column != "engine_id"
+            and column not in ALLOWED_BASE_FEATURES
+            and DERIVED_SENSOR_PATTERN.fullmatch(column) is None
+        }

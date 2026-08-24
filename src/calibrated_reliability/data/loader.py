@@ -8,16 +8,11 @@ from pathlib import Path
 
 import pandas as pd
 
-COLUMNS = [
-    "engine_id",
-    "cycle",
-    "op_setting_1",
-    "op_setting_2",
-    "op_setting_3",
-    *[f"sensor_{index}" for index in range(1, 22)],
-]
+OP_SETTING_COLUMNS = [f"op_setting_{index}" for index in range(1, 4)]
+SENSOR_COLUMNS = [f"sensor_{index}" for index in range(1, 22)]
+COLUMNS = ["engine_id", "cycle", *OP_SETTING_COLUMNS, *SENSOR_COLUMNS]
 INTEGER_COLUMNS = ["engine_id", "cycle"]
-FLOAT_COLUMNS = COLUMNS[2:]
+FLOAT_COLUMNS = [*OP_SETTING_COLUMNS, *SENSOR_COLUMNS]
 
 
 def _read_trajectory(path: Path) -> pd.DataFrame:

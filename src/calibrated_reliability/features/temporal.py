@@ -7,6 +7,10 @@ from typing import Any
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 
+from calibrated_reliability.data.loader import COLUMNS, OP_SETTING_COLUMNS, SENSOR_COLUMNS
+
+RAW_FEATURE_COLUMNS = frozenset(COLUMNS)
+
 
 class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: ignore[misc]
     """Create current, lag, rolling, and trajectory-index features.
@@ -34,7 +38,7 @@ class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: igno
         """Learn the sensor list and low-variance exclusions from training data."""
         del y
         self._validate_input(X)
-        sensors = [column for column in X.columns if str(column).startswith("sensor_")]
+        sensors = [column for column in SENSOR_COLUMNS if column in X.columns]
         if not sensors:
             raise ValueError("No sensor columns found")
         variances = X[sensors].astype("float64").var(ddof=0)
@@ -44,6 +48,7 @@ class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: igno
         if not self.sensor_columns_:
             raise ValueError("All sensors were removed by variance threshold")
         self.feature_names_in_ = list(X.columns)
+        self.feature_names_out_ = self._output_feature_names()
         self._fitted = True
         return self
 
@@ -55,10 +60,20 @@ class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: igno
         missing = set(self.sensor_columns_).difference(X.columns)
         if missing:
             raise ValueError(f"Missing fitted columns: {sorted(missing)}")
+        missing_input = set(self.feature_names_in_).difference(X.columns)
+        extra_input = set(X.columns).difference(self.feature_names_in_)
+        if missing_input or extra_input:
+            raise ValueError(
+                "Raw feature schema differs from fit; "
+                f"missing={sorted(missing_input)}, extra={sorted(extra_input)}"
+            )
         frame = X.sort_values(["engine_id", "cycle"], kind="stable").copy()
         groups = frame.groupby("engine_id", sort=False)
-        output = frame[["engine_id", "cycle"]].copy()
-        for column in ["op_setting_1", "op_setting_2", "op_setting_3", *self.sensor_columns_]:
+        output: dict[str, pd.Series] = {
+            "engine_id": frame["engine_id"],
+            "cycle": frame["cycle"],
+        }
+        for column in [*OP_SETTING_COLUMNS, *self.sensor_columns_]:
             output[column] = frame[column].astype("float64")
         for sensor in self.sensor_columns_:
             output[f"{sensor}_delta_1"] = groups[sensor].diff().fillna(0.0)
@@ -74,8 +89,23 @@ class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: igno
                     self._slope, raw=True
                 ).reset_index(level=0, drop=True)
         output["cycle_index"] = frame["cycle"].astype("float64")
-        self.feature_names_out_ = list(output.columns)
-        return output.reset_index(drop=True)
+        return pd.DataFrame(output, index=frame.index).reset_index(drop=True)
+
+    def _output_feature_names(self) -> list[str]:
+        """Return the deterministic output schema learned during fit."""
+        names = ["engine_id", "cycle", *OP_SETTING_COLUMNS, *self.sensor_columns_]
+        for sensor in self.sensor_columns_:
+            names.append(f"{sensor}_delta_1")
+            for window in self.windows:
+                names.extend(
+                    [
+                        f"{sensor}_rolling_mean_{window}",
+                        f"{sensor}_rolling_std_{window}",
+                        f"{sensor}_rolling_slope_{window}",
+                    ]
+                )
+        names.append("cycle_index")
+        return names
 
     @staticmethod
     def _slope(values: Any) -> float:
@@ -94,6 +124,11 @@ class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: igno
     @staticmethod
     def _validate_input(X: pd.DataFrame) -> None:
         """Validate the minimum trajectory schema."""
-        required = {"engine_id", "cycle", "op_setting_1", "op_setting_2", "op_setting_3"}
+        if not all(isinstance(column, str) for column in X.columns):
+            raise ValueError("All feature names must be strings")
+        unexpected = set(X.columns).difference(RAW_FEATURE_COLUMNS)
+        if unexpected:
+            raise ValueError(f"Unexpected raw feature columns: {sorted(unexpected)}")
+        required = {"engine_id", "cycle", *OP_SETTING_COLUMNS}
         if not required.issubset(X.columns):
             raise ValueError(f"Missing feature columns: {sorted(required.difference(X.columns))}")
