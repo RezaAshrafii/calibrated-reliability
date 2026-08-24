@@ -1,0 +1,65 @@
+"""Leakage and correctness tests for Phase 5 features."""
+
+import pandas as pd
+import pytest
+
+from calibrated_reliability.features.regime import RegimeAwareScaler
+from calibrated_reliability.features.temporal import TemporalFeatureTransformer
+
+
+def toy_frame() -> pd.DataFrame:
+    """Create two short trajectories with operating settings and sensors."""
+    return pd.DataFrame(
+        {
+            "engine_id": [1, 1, 1, 1, 2, 2, 2, 2],
+            "cycle": [1, 2, 3, 4, 1, 2, 3, 4],
+            "op_setting_1": [0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0],
+            "op_setting_2": 0.0,
+            "op_setting_3": 0.0,
+            "sensor_1": [1.0, 2.0, 3.0, 4.0, 10.0, 11.0, 12.0, 13.0],
+            "sensor_2": 1.0,
+        }
+    )
+
+
+def test_temporal_transform_requires_fit() -> None:
+    """Transform before fit is rejected."""
+    with pytest.raises(RuntimeError, match="fitted"):
+        TemporalFeatureTransformer().transform(toy_frame())
+
+
+def test_temporal_features_are_past_only_and_train_selected() -> None:
+    """Constant sensor removal is train-only and first delta has no past value."""
+    frame = toy_frame()
+    transformer = TemporalFeatureTransformer(windows=(2,), variance_threshold=0.0).fit(
+        frame.iloc[:4]
+    )
+    transformed = transformer.transform(frame.iloc[:4])
+    assert "sensor_2" not in transformed.columns
+    assert transformed.loc[0, "sensor_1_delta_1"] == 0.0
+    assert transformed.loc[1, "sensor_1_delta_1"] == 1.0
+    assert transformed.loc[0, "sensor_1_rolling_mean_2"] == 1.0
+
+
+def test_temporal_transform_does_not_use_future_row() -> None:
+    """Adding a future row does not change earlier rolling features."""
+    transformer = TemporalFeatureTransformer(windows=(3,)).fit(toy_frame().iloc[:4])
+    short = transformer.transform(toy_frame().iloc[:3])
+    long = transformer.transform(toy_frame().iloc[:4]).iloc[:3]
+    comparable = [column for column in short.columns if column != "cycle_ratio"]
+    pd.testing.assert_frame_equal(short[comparable], long[comparable], check_dtype=False)
+
+
+def test_regime_scaler_requires_fit_and_handles_unseen_settings() -> None:
+    """Regime scaler is train-fitted and predicts a regime for new settings."""
+    frame = toy_frame()
+    scaler = RegimeAwareScaler(n_regimes=2)
+    with pytest.raises(RuntimeError, match="fitted"):
+        scaler.transform(frame)
+    scaler.fit(frame)
+    new = frame.iloc[:2].copy()
+    new["op_setting_1"] = 99.0
+    result = scaler.transform(new)
+    assert result.shape == (2, len(frame.columns) - 1)
+    assert "engine_id" not in result.columns
+    assert result.notna().all().all()
