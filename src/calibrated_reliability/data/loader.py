@@ -38,13 +38,13 @@ def _read_trajectory(path: Path) -> pd.DataFrame:
         raise ValueError(f"{path.name}: missing values are not allowed")
     if frame.duplicated(["engine_id", "cycle"]).any():
         raise ValueError(f"{path.name}: duplicate (engine_id, cycle) pair")
-    frame = frame.sort_values(["engine_id", "cycle"], kind="stable").reset_index(drop=True)
     if (
         not frame.groupby("engine_id", sort=False)["cycle"]
         .apply(lambda values: values.is_monotonic_increasing)
         .all()
     ):
         raise ValueError(f"{path.name}: cycles must increase within each engine")
+    frame = frame.sort_values(["engine_id", "cycle"], kind="stable").reset_index(drop=True)
     return frame
 
 

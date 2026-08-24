@@ -4,7 +4,7 @@ Reproducible study of calibrated predictive reliability under structured distrib
 
 ## Status
 
-**Phase 0–1: protocol and repository scaffold.** Later experimental phases are intentionally not implemented yet.
+**Phase 0–3: protocol, data registry, and validated C-MAPSS loaders.** Modeling and conformal phases are intentionally not implemented yet.
 
 ## Research scope
 
@@ -33,4 +33,3 @@ Raw data belongs in `data/raw/` and is intentionally ignored by Git. See `docs/p
 ## Citation
 
 Citation metadata is provided in `CITATION.cff`. No DOI is claimed until an actual archive is created.
-
