@@ -10,6 +10,9 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
+ALLOWED_FEATURE_PREFIXES = ("sensor_", "op_setting_")
+ALLOWED_FEATURES = {"cycle", "cycle_index"}
+
 
 class RegimeAwareScaler(BaseEstimator, TransformerMixin):  # type: ignore[misc]
     """Scale features globally or by operating regime learned on training data."""
@@ -24,10 +27,15 @@ class RegimeAwareScaler(BaseEstimator, TransformerMixin):  # type: ignore[misc]
         del y
         self._validate_input(X)
         self._global_only = False
-        forbidden = {"rul_raw", "rul_capped", "target", "label", "y"}
-        leaked = forbidden.intersection(X.columns)
-        if leaked:
-            raise ValueError(f"Target columns are not allowed as features: {sorted(leaked)}")
+        unexpected = {
+            column
+            for column in X.columns
+            if column != "engine_id"
+            and column not in ALLOWED_FEATURES
+            and not column.startswith(ALLOWED_FEATURE_PREFIXES)
+        }
+        if unexpected:
+            raise ValueError(f"Only approved feature columns are allowed: {sorted(unexpected)}")
         self.feature_columns_ = [column for column in X.columns if column != "engine_id"]
         if not self.feature_columns_:
             raise ValueError("No model features remain after removing engine_id")
@@ -53,7 +61,7 @@ class RegimeAwareScaler(BaseEstimator, TransformerMixin):  # type: ignore[misc]
             model = KMeans(n_clusters=candidate, random_state=self.random_state, n_init=10).fit(
                 scaled_settings
             )
-            if len(set(model.labels_)) < 2:
+            if len(set(model.labels_)) != candidate:
                 continue
             scores[candidate] = float(silhouette_score(scaled_settings, model.labels_))
         if not scores:
@@ -69,6 +77,7 @@ class RegimeAwareScaler(BaseEstimator, TransformerMixin):  # type: ignore[misc]
             self.scalers_[regime] = StandardScaler().fit(
                 X.loc[labels == regime, self.feature_columns_]
             )
+        self.feature_names_out_ = list(self.feature_columns_)
         self._fitted = True
         return self
 
@@ -79,6 +88,7 @@ class RegimeAwareScaler(BaseEstimator, TransformerMixin):  # type: ignore[misc]
         self.scalers_ = {}
         self._global_only = True
         self._fitted = True
+        self.feature_names_out_ = list(self.feature_columns_)
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """Transform using train-fitted regime assignments and scalers."""

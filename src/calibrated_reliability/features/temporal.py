@@ -9,7 +9,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 
 
 class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: ignore[misc]
-    """Create current, lag, rolling, and trajectory-relative features.
+    """Create current, lag, rolling, and trajectory-index features.
 
     ``fit`` learns only the low-variance sensor list from the supplied training
     frame. ``transform`` computes rolling statistics in engine/cycle order and
@@ -21,7 +21,6 @@ class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: igno
         self,
         windows: tuple[int, ...] = (5, 10, 20),
         variance_threshold: float = 0.0,
-        include_cycle_ratio: bool = False,
     ) -> None:
         if not windows or any(not isinstance(window, int) or window < 1 for window in windows):
             raise ValueError("windows must contain positive integers")
@@ -29,7 +28,6 @@ class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: igno
             raise ValueError("variance_threshold must be nonnegative")
         self.windows = windows
         self.variance_threshold = variance_threshold
-        self.include_cycle_ratio = include_cycle_ratio
         self._fitted = False
 
     def fit(self, X: pd.DataFrame, y: Any = None) -> TemporalFeatureTransformer:
@@ -54,6 +52,9 @@ class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: igno
         if not self._fitted:
             raise RuntimeError("TemporalFeatureTransformer must be fitted before transform")
         self._validate_input(X)
+        missing = set(self.sensor_columns_).difference(X.columns)
+        if missing:
+            raise ValueError(f"Missing fitted columns: {sorted(missing)}")
         frame = X.sort_values(["engine_id", "cycle"], kind="stable").copy()
         groups = frame.groupby("engine_id", sort=False)
         output = frame[["engine_id", "cycle"]].copy()
@@ -72,16 +73,8 @@ class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: igno
                 output[f"{sensor}_rolling_slope_{window}"] = rolling.apply(
                     self._slope, raw=True
                 ).reset_index(level=0, drop=True)
-        if self.include_cycle_ratio:
-            if "observation_horizon" not in frame.columns:
-                raise ValueError(
-                    "include_cycle_ratio requires an externally supplied observation_horizon"
-                )
-            horizon = pd.to_numeric(frame["observation_horizon"], errors="raise")
-            if (horizon < frame["cycle"]).any() or (horizon <= 0).any():
-                raise ValueError("observation_horizon must be positive and at least cycle")
-            output["cycle_ratio"] = frame["cycle"].astype("float64") / horizon.astype("float64")
         output["cycle_index"] = frame["cycle"].astype("float64")
+        self.feature_names_out_ = list(output.columns)
         return output.reset_index(drop=True)
 
     @staticmethod
