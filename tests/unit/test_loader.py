@@ -53,6 +53,25 @@ def test_malformed_line_detection(tmp_path: Path) -> None:
         load_train(target)
 
 
+@pytest.mark.parametrize("replacement", ["1.5 1 ", "1 -1 "])
+def test_invalid_integer_identifiers_fail_closed(tmp_path: Path, replacement: str) -> None:
+    """Fractional and non-positive identifiers cannot be silently coerced."""
+    target = tmp_path / "invalid_ids.txt"
+    target.write_text(
+        FIXTURE.read_text(encoding="utf-8").replace("1 1 ", replacement, 1), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="engine_id|cycle|positive|integers"):
+        load_train(target)
+
+
+def test_malformed_rul_schema_fails_closed(tmp_path: Path) -> None:
+    """RUL input must be exactly one finite integer per line."""
+    target = tmp_path / "malformed_rul.txt"
+    target.write_text("12 99\n12.5\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="exactly one RUL"):
+        load_rul(target)
+
+
 def test_train_test_and_rul_loaders_are_separate(tmp_path: Path) -> None:
     """The three public loaders expose their intended input contracts."""
     trajectory = tmp_path / "trajectory.txt"

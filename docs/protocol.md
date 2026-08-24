@@ -21,7 +21,7 @@ These are hypotheses, not results: CQR may produce narrower intervals at compara
 
 C-MAPSS uses engine-level partitions and the last observed test-engine endpoint as the primary evaluation unit. MALT uses task-family-aware partitions and transcript-level evaluation. Transformers, feature selectors, scalers, thresholds, and tuning decisions must be fit only on relevant training data. Official test data is never used for tuning.
 
-Fixed seeds are `13, 37, 73, 101, 137`. C-MAPSS shift labels are FD001→FD001 in-distribution, FD001→FD002 operating-condition shift, FD001→FD003 fault-mode shift, and FD001→FD004 compound/structural shift. FD003/FD004 must not be described as pure covariate shift.
+For C-MAPSS, each source training set is split by engine into 60% base-train, 20% calibration, and 20% validation using each fixed seed. Calibration uses one deterministic cut point per calibration engine, with at least 30 observed cycles and a cut point between 40% and 90% of that engine's observed trajectory. The primary RUL cap is 125; cap 130 is the preregistered sensitivity. Fixed seeds are `13, 37, 73, 101, 137`, and primary conformal levels are alpha `0.10` and `0.05`. C-MAPSS shift labels are FD001→FD001 in-distribution, FD001→FD002 operating-condition shift, FD001→FD003 fault-mode shift, and FD001→FD004 compound/structural shift. FD003/FD004 must not be described as pure covariate shift.
 
 ## Primary metrics
 
@@ -30,4 +30,3 @@ RUL: RMSE, MAE, signed error, NASA asymmetric score, interval coverage, interval
 ## Integrity rules
 
 Runs must retain configuration, seed, data hashes, environment versions, split manifest, git SHA, metrics, predictions, and logs. No number is allowed into the paper unless it exists in a verified artifact. ACI is an adaptive/online calibration method, not a batch method. MALT is not assumed to be a clean binary dataset. Negative or inconvenient results must be retained.
-

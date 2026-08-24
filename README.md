@@ -13,7 +13,7 @@ The project evaluates point and interval predictions across C-MAPSS operating/fa
 ## Quickstart
 
 ```bash
-uv sync --extra dev
+uv sync --locked --extra dev
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy src
