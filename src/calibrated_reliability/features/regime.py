@@ -23,12 +23,20 @@ class RegimeAwareScaler(BaseEstimator, TransformerMixin):  # type: ignore[misc]
         """Fit clustering and per-regime scalers on training data."""
         del y
         self._validate_input(X)
+        self._global_only = False
+        forbidden = {"rul_raw", "rul_capped", "target", "label", "y"}
+        leaked = forbidden.intersection(X.columns)
+        if leaked:
+            raise ValueError(f"Target columns are not allowed as features: {sorted(leaked)}")
         self.feature_columns_ = [column for column in X.columns if column != "engine_id"]
         if not self.feature_columns_:
             raise ValueError("No model features remain after removing engine_id")
         settings = X[["op_setting_1", "op_setting_2", "op_setting_3"]].astype("float64")
         self.setting_scaler_ = StandardScaler().fit(settings)
         scaled_settings = self.setting_scaler_.transform(settings)
+        if len(pd.DataFrame(scaled_settings).drop_duplicates()) < 2:
+            self._fit_global(X)
+            return self
         maximum = min(6, len(X) - 1)
         if maximum < 2:
             raise ValueError("At least 3 training rows are required for regime fitting")
@@ -45,7 +53,12 @@ class RegimeAwareScaler(BaseEstimator, TransformerMixin):  # type: ignore[misc]
             model = KMeans(n_clusters=candidate, random_state=self.random_state, n_init=10).fit(
                 scaled_settings
             )
+            if len(set(model.labels_)) < 2:
+                continue
             scores[candidate] = float(silhouette_score(scaled_settings, model.labels_))
+        if not scores:
+            self._fit_global(X)
+            return self
         self.n_regimes_ = max(scores, key=lambda key: scores[key])
         self.clusterer_ = KMeans(
             n_clusters=self.n_regimes_, random_state=self.random_state, n_init=10
@@ -59,12 +72,26 @@ class RegimeAwareScaler(BaseEstimator, TransformerMixin):  # type: ignore[misc]
         self._fitted = True
         return self
 
+    def _fit_global(self, X: pd.DataFrame) -> None:
+        """Fit a global scaler for one-regime or invalid-cluster data."""
+        self.global_scaler_ = StandardScaler().fit(X[self.feature_columns_])
+        self.n_regimes_ = 1
+        self.scalers_ = {}
+        self._global_only = True
+        self._fitted = True
+
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """Transform using train-fitted regime assignments and scalers."""
         if not self._fitted:
             raise RuntimeError("RegimeAwareScaler must be fitted before transform")
         self._validate_input(X)
         values = X[self.feature_columns_].astype("float64")
+        if getattr(self, "_global_only", False):
+            return pd.DataFrame(
+                self.global_scaler_.transform(values),
+                columns=self.feature_columns_,
+                index=X.index,
+            ).reset_index(drop=True)
         settings = X[["op_setting_1", "op_setting_2", "op_setting_3"]].astype("float64")
         labels = self.clusterer_.predict(self.setting_scaler_.transform(settings))
         result = pd.DataFrame(index=X.index, columns=self.feature_columns_, dtype="float64")

@@ -18,10 +18,18 @@ class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: igno
     """
 
     def __init__(
-        self, windows: tuple[int, ...] = (5, 10, 20), variance_threshold: float = 0.0
+        self,
+        windows: tuple[int, ...] = (5, 10, 20),
+        variance_threshold: float = 0.0,
+        include_cycle_ratio: bool = False,
     ) -> None:
+        if not windows or any(not isinstance(window, int) or window < 1 for window in windows):
+            raise ValueError("windows must contain positive integers")
+        if variance_threshold < 0:
+            raise ValueError("variance_threshold must be nonnegative")
         self.windows = windows
         self.variance_threshold = variance_threshold
+        self.include_cycle_ratio = include_cycle_ratio
         self._fitted = False
 
     def fit(self, X: pd.DataFrame, y: Any = None) -> TemporalFeatureTransformer:
@@ -64,8 +72,15 @@ class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: igno
                 output[f"{sensor}_rolling_slope_{window}"] = rolling.apply(
                     self._slope, raw=True
                 ).reset_index(level=0, drop=True)
-        observed_length = groups["cycle"].transform("max").astype("float64")
-        output["cycle_ratio"] = frame["cycle"].astype("float64") / observed_length
+        if self.include_cycle_ratio:
+            if "observation_horizon" not in frame.columns:
+                raise ValueError(
+                    "include_cycle_ratio requires an externally supplied observation_horizon"
+                )
+            horizon = pd.to_numeric(frame["observation_horizon"], errors="raise")
+            if (horizon < frame["cycle"]).any() or (horizon <= 0).any():
+                raise ValueError("observation_horizon must be positive and at least cycle")
+            output["cycle_ratio"] = frame["cycle"].astype("float64") / horizon.astype("float64")
         output["cycle_index"] = frame["cycle"].astype("float64")
         return output.reset_index(drop=True)
 
