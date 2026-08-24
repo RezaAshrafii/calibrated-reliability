@@ -69,6 +69,7 @@ class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: igno
             )
         frame = X.sort_values(["engine_id", "cycle"], kind="stable").copy()
         groups = frame.groupby("engine_id", sort=False)
+        positions = groups.cumcount().astype("float64")
         output: dict[str, pd.Series] = {
             "engine_id": frame["engine_id"],
             "cycle": frame["cycle"],
@@ -85,9 +86,9 @@ class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: igno
                 output[f"{sensor}_rolling_std_{window}"] = (
                     rolling.std(ddof=0).fillna(0.0).reset_index(level=0, drop=True)
                 )
-                output[f"{sensor}_rolling_slope_{window}"] = rolling.apply(
-                    self._slope, raw=True
-                ).reset_index(level=0, drop=True)
+                output[f"{sensor}_rolling_slope_{window}"] = self._rolling_slope(
+                    frame["engine_id"], frame[sensor], positions, window
+                )
         output["cycle_index"] = frame["cycle"].astype("float64")
         return pd.DataFrame(output, index=frame.index).reset_index(drop=True)
 
@@ -108,18 +109,31 @@ class TemporalFeatureTransformer(BaseEstimator, TransformerMixin):  # type: igno
         return names
 
     @staticmethod
-    def _slope(values: Any) -> float:
-        """Compute a least-squares slope for one past-only rolling window."""
-        if len(values) < 2:
-            return 0.0
-        x = pd.Series(range(len(values)), dtype="float64")
-        y = pd.Series(values, dtype="float64")
-        denominator = float(((x - x.mean()) ** 2).sum())
-        return (
-            0.0
-            if denominator == 0.0
-            else float(((x - x.mean()) * (y - y.mean())).sum() / denominator)
+    def _rolling_slope(
+        engine_ids: pd.Series,
+        values: pd.Series,
+        positions: pd.Series,
+        window: int,
+    ) -> pd.Series:
+        """Compute past-only least-squares slopes with rolling sufficient statistics."""
+        work = pd.DataFrame(
+            {
+                "engine_id": engine_ids,
+                "y": values.astype("float64"),
+                "x": positions,
+            }
         )
+        work["xy"] = work["x"] * work["y"]
+        work["x2"] = work["x"] * work["x"]
+        rolling = work.groupby("engine_id", sort=False).rolling(window, min_periods=1)
+        count = rolling["y"].count().reset_index(level=0, drop=True)
+        sum_y = rolling["y"].sum().reset_index(level=0, drop=True)
+        sum_x = rolling["x"].sum().reset_index(level=0, drop=True)
+        sum_xy = rolling["xy"].sum().reset_index(level=0, drop=True)
+        sum_x2 = rolling["x2"].sum().reset_index(level=0, drop=True)
+        numerator = count * sum_xy - sum_x * sum_y
+        denominator = count * sum_x2 - sum_x * sum_x
+        return numerator.div(denominator.where(denominator != 0, 1.0)).where(denominator != 0, 0.0)
 
     @staticmethod
     def _validate_input(X: pd.DataFrame) -> None:

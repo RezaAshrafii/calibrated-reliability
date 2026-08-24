@@ -4,7 +4,7 @@ Reproducible study of calibrated predictive reliability under structured distrib
 
 ## Status
 
-**Phase 0–3: protocol, data registry, and validated C-MAPSS loaders.** Modeling and conformal phases are intentionally not implemented yet.
+**Phase 0–5 complete; Phase 6 implements the C01 point-prediction baseline runner.** Conformal, shift-matrix, and MALT phases remain intentionally unimplemented.
 
 ## Research scope
 

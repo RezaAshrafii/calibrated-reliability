@@ -2,7 +2,7 @@
 
 | ID | Question | Method | Source → target | Unit | Alpha | Seed | Primary metric | Config path | Status |
 |---|---|---|---|---|---|---|---|---|---|
-| C01 | RQ1 | Baselines | FD001 → FD001 | engine endpoint | — | 13,37,73,101,137 | RMSE/MAE | configs/cmapss/fd001_baseline.yaml | planned |
+| C01 | RQ1 | Baselines | FD001 → FD001 | engine endpoint | — | 13,37,73,101,137 | RMSE/MAE | configs/cmapss/fd001_baseline.yaml | implemented |
 | C02 | RQ2 | Split conformal | FD001 → FD001 | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/conformal.yaml | planned |
 | C03 | RQ3 | CQR | FD001 → FD001 | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/conformal.yaml | planned |
 | C04 | RQ4 | Shift matrix | FD001 → FD002/3/4 | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/shift_matrix.yaml | planned |
