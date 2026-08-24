@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+title: "Calibrated Predictive Reliability Under Structured Distribution Shift"
+message: "If you use this repository, please cite it using this metadata. Replace the version and DOI only after a real release."
+type: software
+authors:
+  - family-names: Ashrafi
+    given-names: Reza
+version: 0.1.0
+date-released: 2026-08-24
+license: MIT
+repository-code: "https://github.com/RezaAshrafii/calibrated-reliability"
+
