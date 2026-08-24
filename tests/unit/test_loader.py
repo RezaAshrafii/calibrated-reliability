@@ -64,12 +64,48 @@ def test_invalid_integer_identifiers_fail_closed(tmp_path: Path, replacement: st
         load_train(target)
 
 
+def test_fractional_cycle_fails_closed(tmp_path: Path) -> None:
+    """Fractional cycle values cannot be silently coerced."""
+    target = tmp_path / "fractional_cycle.txt"
+    target.write_text(
+        FIXTURE.read_text(encoding="utf-8").replace("1 1 ", "1 1.5 ", 1), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="cycle.*integers"):
+        load_train(target)
+
+
 def test_malformed_rul_schema_fails_closed(tmp_path: Path) -> None:
     """RUL input must be exactly one finite integer per line."""
     target = tmp_path / "malformed_rul.txt"
     target.write_text("12 99\n12.5\n", encoding="utf-8")
     with pytest.raises(ValueError, match="exactly one RUL"):
         load_rul(target)
+
+
+def test_fractional_rul_fails_closed(tmp_path: Path) -> None:
+    """Fractional RUL values cannot be silently coerced."""
+    target = tmp_path / "fractional_rul.txt"
+    target.write_text("12.5\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="finite integers"):
+        load_rul(target)
+
+
+def test_empty_rul_fails_closed(tmp_path: Path) -> None:
+    """An empty RUL file is invalid."""
+    target = tmp_path / "empty_rul.txt"
+    target.write_text("\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="empty"):
+        load_rul(target)
+
+
+def test_infinite_sensor_fails_closed(tmp_path: Path) -> None:
+    """Infinite sensor values are rejected."""
+    target = tmp_path / "infinite_sensor.txt"
+    target.write_text(
+        FIXTURE.read_text(encoding="utf-8").replace(" 1 2 3 ", " inf 2 3 ", 1), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="finite"):
+        load_train(target)
 
 
 def test_train_test_and_rul_loaders_are_separate(tmp_path: Path) -> None:

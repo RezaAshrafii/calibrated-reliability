@@ -42,6 +42,8 @@ def _read_trajectory(path: Path) -> pd.DataFrame:
             raise ValueError(f"{path.name}: {column} values must be positive")
     for column in FLOAT_COLUMNS:
         frame[column] = pd.to_numeric(frame[column], errors="raise").astype("float64")
+        if not frame[column].map(math.isfinite).all():
+            raise ValueError(f"{path.name}: {column} values must be finite")
     if frame.isna().any().any():
         raise ValueError(f"{path.name}: missing values are not allowed")
     if frame.duplicated(["engine_id", "cycle"]).any():
@@ -83,6 +85,8 @@ def load_rul(path: Path) -> pd.DataFrame:
         if not math.isfinite(value) or not value.is_integer():
             raise ValueError(f"{path.name}: RUL values must be finite integers")
         parsed.append(int(value))
+    if not parsed:
+        raise ValueError(f"{path.name}: RUL file is empty")
     values = pd.DataFrame({"rul": pd.Series(parsed, dtype="int64")})
     if (values["rul"] < 0).any():
         raise ValueError(f"{path.name}: RUL values cannot be negative")

@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
 
 EXPECTED_CMAPSS_COLUMNS = 26
+VALID_KINDS = {"cmapss", "rul"}
+SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True)
@@ -37,17 +40,32 @@ def load_registry(path: Path) -> tuple[FileRecord, ...]:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict) or not isinstance(raw.get("files"), list):
         raise ValueError("Registry must contain a top-level 'files' list")
+    if not raw["files"]:
+        raise ValueError("Registry must contain at least one file")
     records: list[FileRecord] = []
+    filenames: set[str] = set()
     for entry in raw["files"]:
         if not isinstance(entry, dict):
             raise ValueError("Each registry entry must be a mapping")
         required = ("filename", "sha256", "expected_bytes", "expected_rows", "kind")
         if any(key not in entry for key in required):
             raise ValueError(f"Registry entry is missing a required field: {entry}")
+        filename = str(entry["filename"])
+        sha256 = str(entry["sha256"]).lower()
+        kind = str(entry["kind"])
+        if filename in filenames:
+            raise ValueError(f"Duplicate registry filename: {filename}")
+        if kind not in VALID_KINDS:
+            raise ValueError(f"Unsupported registry kind: {kind}")
+        if not SHA256_PATTERN.fullmatch(sha256):
+            raise ValueError(f"Invalid SHA-256 for {filename}")
+        if int(entry["expected_bytes"]) < 0 or int(entry["expected_rows"]) < 0:
+            raise ValueError(f"Negative expected count for {filename}")
+        filenames.add(filename)
         records.append(
             FileRecord(
-                filename=str(entry["filename"]),
-                sha256=str(entry["sha256"]).lower(),
+                filename=filename,
+                sha256=sha256,
                 expected_bytes=int(entry["expected_bytes"]),
                 expected_rows=int(entry["expected_rows"]),
                 expected_engines=(
@@ -55,7 +73,7 @@ def load_registry(path: Path) -> tuple[FileRecord, ...]:
                     if entry.get("expected_engines") is None
                     else int(entry["expected_engines"])
                 ),
-                kind=str(entry["kind"]),
+                kind=kind,
             )
         )
     return tuple(records)
@@ -74,6 +92,18 @@ def _data_shape(path: Path, kind: str) -> tuple[int, int | None]:
     """Return row and engine counts for a registered C-MAPSS file."""
     lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     if kind == "rul":
+        if not lines:
+            raise ValueError(f"{path.name}: RUL file is empty")
+        for line_number, line in enumerate(lines, start=1):
+            fields = line.split()
+            if len(fields) != 1:
+                raise ValueError(f"{path.name}: line {line_number} must contain one RUL value")
+            try:
+                value = float(fields[0])
+            except ValueError as exc:
+                raise ValueError(f"{path.name}: invalid RUL on line {line_number}") from exc
+            if not value.is_integer() or value < 0:
+                raise ValueError(f"{path.name}: RUL values must be nonnegative integers")
         return len(lines), None
     engine_ids: set[int] = set()
     for line_number, line in enumerate(lines, start=1):
