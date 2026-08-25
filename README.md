@@ -10,9 +10,9 @@ Reproducible study of calibrated predictive reliability under structured distrib
 
 ## Status
 
-**Implemented:** C01 point-prediction baselines, leakage-safe temporal features, engine-aware splits, C02 split-conformal intervals, immutable provenance-tracked artifacts, and the CI quality gate.
+**Implemented:** C01 point-prediction baselines, leakage-safe temporal features, engine-aware splits, C02 split-conformal intervals, C03 conformalized quantile regression, immutable provenance-tracked artifacts, and the CI quality gate.
 
-**In progress:** C-MAPSS shift matrix, CQR comparison, sensitivity analysis, and the MALT study. These are intentionally not presented as implemented results.
+**In progress:** C-MAPSS shift matrix, sensitivity analysis, and the MALT study. These are intentionally not presented as implemented results.
 
 ## Research scope
 
@@ -43,6 +43,12 @@ Run the complete C02 split-conformal seed set from a clean commit with:
 
 ```bash
 uv run python scripts/run_c02_conformal.py --config configs/cmapss/conformal.yaml --registry data/registry.yaml
+```
+
+Run the C03 conformalized quantile regression experiment with:
+
+```bash
+uv run python scripts/run_c03_cqr.py --config configs/cmapss/cqr.yaml --registry data/registry.yaml
 ```
 
 ## Design principles

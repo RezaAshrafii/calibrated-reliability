@@ -21,6 +21,15 @@ uv run python scripts/run_c02_conformal.py \
 
 The runners refuse dirty worktrees, undeclared seeds, invalid input hashes and overwritten run directories.
 
+The repository now includes the C03 conformalized quantile regression runner. Its results remain pending until the registered raw data is verified and the immutable artifacts are generated.
+
+## C03 — conformalized quantile regression
+
+| Alpha | Coverage | Width | Normalized interval score | 95% CI | Artifact |
+|---:|---:|---:|---:|---|---|
+| 0.10 | pending | pending | pending | pending | pending |
+| 0.05 | pending | pending | pending | pending | pending |
+
 ## C01 — point baselines
 
 | Model | Seed aggregation | RMSE | MAE | NASA score | 95% CI | Artifact |
