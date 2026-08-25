@@ -14,6 +14,7 @@ from typing import Any
 from calibrated_reliability.data.registry import compute_sha256
 from calibrated_reliability.experiments.c01 import C01Config, C01Result
 from calibrated_reliability.experiments.c02 import C02Config, C02Result
+from calibrated_reliability.experiments.c03 import C03Config, C03Result
 
 PACKAGE_NAMES = ("calibrated-reliability", "numpy", "pandas", "scikit-learn", "scipy")
 
@@ -177,6 +178,84 @@ def write_c02_run(
             f"status=completed\nendpoint_rows={len(result.predictions)}\n"
         ).encode()
         artifact_hashes["run.log"] = _write_bytes(temporary_dir / "run.log", log_content)
+        lock_path = _repository_root() / "uv.lock"
+        if not lock_path.is_file():
+            raise FileNotFoundError(f"Repository lockfile not found: {lock_path}")
+        manifest = {
+            "run_id": run_id,
+            "experiment_id": config.experiment_id,
+            "git": {"sha": sha, "dirty": False},
+            "seed": seed,
+            "source": config.source,
+            "target": config.target,
+            "evaluation_unit": config.evaluation_unit,
+            "rul_cap": config.rul_cap,
+            "alphas": list(config.alphas),
+            "data": data_provenance,
+            "data_registry": {
+                "path": registry_path.as_posix(),
+                "sha256": compute_sha256(registry_path),
+            },
+            "configuration": {
+                "path": config_path.as_posix(),
+                "sha256": compute_sha256(config_path),
+            },
+            "lockfile": {"path": "uv.lock", "sha256": compute_sha256(lock_path)},
+            "environment": _environment(),
+            "split_manifest": result.partitions,
+            "calibration_cut_points": result.cut_points,
+            "preprocessing": {"feature_names": result.feature_names},
+            "models": config.as_dict()["models"],
+            "bootstrap": config.as_dict()["bootstrap"],
+            "quantiles": result.quantiles,
+            "artifacts": artifact_hashes,
+        }
+        _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))
+        if run_dir.exists():
+            raise FileExistsError(run_dir)
+        temporary_dir.rename(run_dir)
+        return run_dir
+    except Exception:
+        shutil.rmtree(temporary_dir, ignore_errors=True)
+        raise
+
+
+def write_c03_run(
+    output_root: Path,
+    seed: int,
+    sha: str,
+    config: C03Config,
+    result: C03Result,
+    config_path: Path,
+    registry_path: Path,
+    data_provenance: dict[str, dict[str, Any]],
+) -> Path:
+    """Write one atomic, provenance-complete C03 artifact directory."""
+    run_id = f"C03_{sha[:12]}_seed_{seed}"
+    run_dir = output_root / run_id
+    output_root.mkdir(parents=True, exist_ok=True)
+    if run_dir.exists():
+        raise FileExistsError(run_dir)
+    temporary_dir = Path(tempfile.mkdtemp(prefix=f".{run_id}.", dir=output_root))
+    try:
+        artifact_hashes: dict[str, str] = {}
+        for filename, content in {
+            "predictions.csv": result.predictions.to_csv(index=False).encode("utf-8"),
+            "calibration_scores.csv": result.calibration_scores.to_csv(index=False).encode(
+                "utf-8"
+            ),
+            "metrics.json": _json_bytes(result.metrics),
+            "split_manifest.json": _json_bytes(
+                {"seed": seed, "partitions": result.partitions, "cut_points": result.cut_points}
+            ),
+            "resolved_config.json": _json_bytes(config.as_dict()),
+            "quantiles.json": _json_bytes(result.quantiles),
+            "run.log": (
+                f"experiment_id=C03\nseed={seed}\ngit_sha={sha}\nstatus=completed\n"
+                f"endpoint_rows={len(result.predictions)}\n"
+            ).encode(),
+        }.items():
+            artifact_hashes[filename] = _write_bytes(temporary_dir / filename, content)
         lock_path = _repository_root() / "uv.lock"
         if not lock_path.is_file():
             raise FileNotFoundError(f"Repository lockfile not found: {lock_path}")

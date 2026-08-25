@@ -47,6 +47,46 @@ def split_conformal_intervals(
     return center - q, center + q, q
 
 
+def cqr_conformity_quantile(
+    y_calibration: Any, lower_prediction: Any, upper_prediction: Any, alpha: float
+) -> float:
+    """Return the finite-sample CQR conformity quantile."""
+    truth = pd.to_numeric(pd.Series(y_calibration), errors="raise").to_numpy(dtype="float64")
+    lower = pd.to_numeric(pd.Series(lower_prediction), errors="raise").to_numpy(dtype="float64")
+    upper = pd.to_numeric(pd.Series(upper_prediction), errors="raise").to_numpy(dtype="float64")
+    if len(truth) == 0 or len(truth) != len(lower) or len(lower) != len(upper):
+        raise ValueError("CQR arrays must have equal non-zero length")
+    if (
+        not np.isfinite(truth).all()
+        or not np.isfinite(lower).all()
+        or not np.isfinite(upper).all()
+    ):
+        raise ValueError("CQR arrays must be finite")
+    if (lower > upper).any():
+        raise ValueError("CQR lower predictions cannot exceed upper predictions")
+    scores = np.maximum(lower - truth, truth - upper)
+    return conformal_quantile(np.maximum(scores, 0.0), alpha)
+
+
+def cqr_intervals(
+    y_calibration: Any,
+    lower_calibration: Any,
+    upper_calibration: Any,
+    lower_prediction: Any,
+    upper_prediction: Any,
+    alpha: float,
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Build unbounded CQR intervals without refitting quantile models."""
+    q = cqr_conformity_quantile(y_calibration, lower_calibration, upper_calibration, alpha)
+    lower = pd.to_numeric(pd.Series(lower_prediction), errors="raise").to_numpy(dtype="float64")
+    upper = pd.to_numeric(pd.Series(upper_prediction), errors="raise").to_numpy(dtype="float64")
+    if len(lower) == 0 or len(lower) != len(upper):
+        raise ValueError("CQR prediction arrays must have equal non-zero length")
+    if not np.isfinite(lower).all() or not np.isfinite(upper).all():
+        raise ValueError("CQR prediction arrays must be finite")
+    return lower - q, upper + q, q
+
+
 def interval_metrics(
     y_true: Any,
     lower: Any,
