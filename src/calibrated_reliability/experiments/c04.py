@@ -1,0 +1,72 @@
+"""Configuration and orchestration helpers for the C04 shift matrix."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+import yaml
+
+from calibrated_reliability.experiments.c02 import C02Config, C02Result, run_c02
+
+C04_TARGETS = ("FD001", "FD002", "FD003", "FD004")
+C04_SEEDS = (13, 37, 73, 101, 137)
+
+
+@dataclass(frozen=True)
+class C04Config:
+    """Strict shift-matrix configuration with a frozen C02 evaluator."""
+
+    targets: tuple[str, ...]
+    c02: C02Config
+
+    @classmethod
+    def from_yaml(cls, text: str) -> C04Config:
+        raw = yaml.safe_load(text)
+        if not isinstance(raw, dict):
+            raise ValueError("C04 configuration must be a mapping")
+        if set(raw) != {
+            "experiment_id",
+            "source",
+            "targets",
+            "evaluation_unit",
+            "seeds",
+            "alphas",
+            "rul_cap",
+            "preprocessing",
+            "calibration",
+            "bootstrap",
+        }:
+            raise ValueError("C04 configuration schema mismatch")
+        targets = raw["targets"]
+        if not isinstance(targets, list) or tuple(targets) != C04_TARGETS:
+            raise ValueError("C04 targets must be FD001, FD002, FD003, FD004 in order")
+        if raw["source"] != "FD001" or raw["experiment_id"] != "C04":
+            raise ValueError("C04 source or experiment is invalid")
+        c02_raw = dict(raw)
+        c02_raw.pop("targets")
+        c02_raw["experiment_id"] = "C02"
+        c02_raw["target"] = "FD001"
+        c02 = C02Config.from_yaml(yaml.safe_dump(c02_raw, sort_keys=False))
+        if c02.seeds != C04_SEEDS:
+            raise ValueError("C04 seeds do not match the preregistered design")
+        return cls(tuple(targets), c02)
+
+    def as_dict(self) -> dict[str, Any]:
+        result = self.c02.as_dict()
+        result["experiment_id"] = "C04"
+        result["targets"] = list(self.targets)
+        return result
+
+
+def run_c04_target(
+    source_train: Any,
+    target_test: Any,
+    target_rul: Any,
+    config: C04Config,
+    seed: int,
+) -> C02Result:
+    """Evaluate one target domain without refitting or recalibrating on it."""
+    if seed not in config.c02.seeds:
+        raise ValueError(f"Seed {seed} is not declared by C04")
+    return run_c02(source_train, target_test, target_rul, config.c02, seed)
