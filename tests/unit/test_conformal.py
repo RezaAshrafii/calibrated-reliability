@@ -39,6 +39,7 @@ calibration:
 bootstrap:
   n_resamples: 2000
   confidence_level: 0.95
+  seed_policy: experiment_seed
 """
 
 
@@ -107,8 +108,10 @@ def test_c02_config_rejects_undeclared_design_values() -> None:
         config_text().replace("rul_cap: 125", "rul_cap: 130"),
         config_text().replace("seeds: [13, 37, 73, 101, 137]", "seeds: [999]"),
         config_text().replace("n_resamples: 2000", "n_resamples: 1000"),
+        config_text().replace("seed_policy: experiment_seed", "seed_policy: fixed_42"),
+        config_text().replace("confidence_level: 0.95", 'confidence_level: "0.95"'),
     ]:
-        with pytest.raises(ValueError, match="preregistered"):
+        with pytest.raises(ValueError):
             C02Config.from_yaml(changed)
 
 

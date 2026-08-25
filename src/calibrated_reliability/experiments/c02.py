@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -32,6 +33,16 @@ def _strict_int(value: Any, name: str) -> int:
     return value
 
 
+def _strict_float(value: Any, name: str) -> float:
+    """Reject string or non-finite coercion in executable float fields."""
+    if isinstance(value, bool) or not isinstance(value, (float, int)):
+        raise ValueError(f"{name} must be numeric")
+    result = float(value)
+    if not math.isfinite(result):
+        raise ValueError(f"{name} must be finite")
+    return result
+
+
 C02_SEEDS = (13, 37, 73, 101, 137)
 C02_ALPHAS = (0.10, 0.05)
 C02_RUL_CAP = 125
@@ -42,6 +53,7 @@ C02_LOWER_FRACTION = 0.40
 C02_UPPER_FRACTION = 0.90
 C02_BOOTSTRAP_RESAMPLES = 2000
 C02_BOOTSTRAP_CONFIDENCE_LEVEL = 0.95
+C02_BOOTSTRAP_SEED_POLICY = "experiment_seed"
 C02_RIDGE_ALPHA = 1.0
 C02_HGB_MAX_ITER = 50
 C02_HGB_LEARNING_RATE = 0.05
@@ -115,6 +127,7 @@ class C02Config:
         if not isinstance(bootstrap, dict) or set(bootstrap) != {
             "n_resamples",
             "confidence_level",
+            "seed_policy",
         }:
             raise ValueError("C02 bootstrap schema mismatch")
         seeds = raw["seeds"]
@@ -134,17 +147,21 @@ class C02Config:
             target=str(raw["target"]),
             evaluation_unit=str(raw["evaluation_unit"]),
             seeds=tuple(seeds),
-            alphas=tuple(float(value) for value in alphas),
+            alphas=tuple(_strict_float(value, "alpha") for value in alphas),
             rul_cap=_strict_int(raw["rul_cap"], "rul_cap"),
             temporal_windows=tuple(_strict_int(value, "temporal window") for value in windows),
-            variance_threshold=float(preprocessing["variance_threshold"]),
+            variance_threshold=_strict_float(
+                preprocessing["variance_threshold"], "variance_threshold"
+            ),
             min_observed_cycles=_strict_int(
                 calibration["min_observed_cycles"], "min_observed_cycles"
             ),
-            lower_fraction=float(calibration["lower_fraction"]),
-            upper_fraction=float(calibration["upper_fraction"]),
+            lower_fraction=_strict_float(calibration["lower_fraction"], "lower_fraction"),
+            upper_fraction=_strict_float(calibration["upper_fraction"], "upper_fraction"),
             bootstrap_resamples=_strict_int(bootstrap["n_resamples"], "bootstrap.n_resamples"),
-            bootstrap_confidence_level=float(bootstrap["confidence_level"]),
+            bootstrap_confidence_level=_strict_float(
+                bootstrap["confidence_level"], "bootstrap.confidence_level"
+            ),
         )
         if (
             config.experiment_id != "C02"
@@ -162,6 +179,7 @@ class C02Config:
             or config.upper_fraction != C02_UPPER_FRACTION
             or config.bootstrap_resamples != C02_BOOTSTRAP_RESAMPLES
             or config.bootstrap_confidence_level != C02_BOOTSTRAP_CONFIDENCE_LEVEL
+            or bootstrap["seed_policy"] != C02_BOOTSTRAP_SEED_POLICY
         ):
             raise ValueError("C02 configuration does not match the preregistered design")
         return config
@@ -188,6 +206,7 @@ class C02Config:
             "bootstrap": {
                 "n_resamples": self.bootstrap_resamples,
                 "confidence_level": self.bootstrap_confidence_level,
+                "seed_policy": C02_BOOTSTRAP_SEED_POLICY,
             },
             "models": C02_MODEL_SPEC,
         }
