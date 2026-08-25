@@ -50,6 +50,16 @@ def main(
         raise click.ClickException("Undeclared C04 seed requested")
     records = {record.filename: record for record in load_registry(registry_path)}
     provenance: dict[str, dict[str, Any]] = {}
+    source_record = records["train_FD001.txt"]
+    source_checked = validate_file(data_root, source_record)
+    if not source_checked.valid:
+        raise click.ClickException("Data verification failed for train_FD001.txt")
+    provenance["train_FD001.txt"] = {
+        "sha256": source_record.sha256,
+        "bytes": source_record.expected_bytes,
+        "rows": source_record.expected_rows,
+        "engines": source_record.expected_engines,
+    }
     for target in targets:
         for name in (f"test_{target}.txt", f"RUL_{target}.txt"):
             checked = validate_file(data_root, records[name])
