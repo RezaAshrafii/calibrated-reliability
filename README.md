@@ -17,10 +17,17 @@ uv sync --locked --extra dev
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy src
+uv run mypy --no-site-packages --disable-error-code=untyped-decorator scripts
 uv run pytest -q
 ```
 
 Raw data belongs in `data/raw/` and is intentionally ignored by Git. See `docs/protocol.md` and `REPRODUCIBILITY.md` before running experiments.
+
+After data verification and from a clean commit, run the complete C01 seed set with:
+
+```bash
+uv run python scripts/run_c01_baseline.py --config configs/cmapss/fd001_baseline.yaml --registry data/registry.yaml
+```
 
 ## Design principles
 

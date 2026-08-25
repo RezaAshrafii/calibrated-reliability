@@ -21,4 +21,5 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy src
+      - run: uv run mypy --no-site-packages --disable-error-code=untyped-decorator scripts
       - run: uv run pytest -q --cov=calibrated_reliability --cov-report=term-missing

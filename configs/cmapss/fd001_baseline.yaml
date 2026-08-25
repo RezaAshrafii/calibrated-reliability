@@ -4,7 +4,19 @@ target: FD001
 evaluation_unit: engine_endpoint
 seeds: [13, 37, 73, 101, 137]
 rul_cap: 125
+prediction_clip: [0, 125]
+training_weighting: cycle
+preprocessing:
+  temporal_windows: [5, 10, 20]
+  variance_threshold: 0.0
+  regime_aware_scaling: false
 models:
-  - mean
-  - ridge
-  - hist_gradient_boosting
+  mean:
+    strategy: mean
+  ridge:
+    alpha: 1.0
+  hist_gradient_boosting:
+    max_iter: 50
+    learning_rate: 0.05
+    max_leaf_nodes: 31
+    l2_regularization: 1.0

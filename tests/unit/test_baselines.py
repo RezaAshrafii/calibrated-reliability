@@ -28,7 +28,19 @@ def test_baselines_fit_and_predict_deterministically() -> None:
         np.testing.assert_allclose(first[name], second[name])
 
 
-@pytest.mark.parametrize("column", ["engine_id", "rul", "rul_raw", "rul_capped", "target"])
+@pytest.mark.parametrize(
+    "column",
+    [
+        "engine_id",
+        "rul",
+        "rul_raw",
+        "rul_capped",
+        "target",
+        "target_rul",
+        "remaining_useful_life",
+        "y",
+    ],
+)
 def test_baselines_reject_metadata_and_targets(column: str) -> None:
     """Identifiers and labels cannot enter the model feature matrix."""
     with pytest.raises(ValueError):

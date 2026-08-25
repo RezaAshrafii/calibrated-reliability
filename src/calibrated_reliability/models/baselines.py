@@ -12,7 +12,10 @@ from sklearn.linear_model import Ridge
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-TARGET_COLUMNS = frozenset({"rul", "rul_raw", "rul_capped", "target", "y_true"})
+from calibrated_reliability.features.regime import (
+    ALLOWED_BASE_FEATURES,
+    DERIVED_SENSOR_PATTERN,
+)
 
 
 def _validate_features(X: pd.DataFrame) -> None:
@@ -21,9 +24,13 @@ def _validate_features(X: pd.DataFrame) -> None:
         raise TypeError("Model features must be a pandas DataFrame")
     if "engine_id" in X.columns:
         raise ValueError("engine_id is metadata and cannot be a model feature")
-    leaked = TARGET_COLUMNS.intersection(X.columns)
-    if leaked:
-        raise ValueError(f"Target columns are not allowed as model features: {sorted(leaked)}")
+    unexpected = {
+        column
+        for column in X.columns
+        if column not in ALLOWED_BASE_FEATURES and DERIVED_SENSOR_PATTERN.fullmatch(column) is None
+    }
+    if unexpected:
+        raise ValueError(f"Only approved model features are allowed: {sorted(unexpected)}")
     if len(X.columns) == 0:
         raise ValueError("At least one model feature is required")
     if not all(pd.api.types.is_numeric_dtype(X[column]) for column in X.columns):
@@ -42,7 +49,14 @@ def _validate_target(y: Any) -> Any:
     return values
 
 
-def build_baseline_models(random_state: int = 13) -> dict[str, Any]:
+def build_baseline_models(
+    random_state: int = 13,
+    ridge_alpha: float = 1.0,
+    hgb_max_iter: int = 50,
+    hgb_learning_rate: float = 0.05,
+    hgb_max_leaf_nodes: int = 31,
+    hgb_l2_regularization: float = 1.0,
+) -> dict[str, Any]:
     """Build the fixed C01 baseline model set.
 
     ``mean`` is a lower-bound sanity baseline, ``ridge`` is a linear baseline,
@@ -51,12 +65,12 @@ def build_baseline_models(random_state: int = 13) -> dict[str, Any]:
     """
     return {
         "mean": DummyRegressor(strategy="mean"),
-        "ridge": make_pipeline(StandardScaler(), Ridge(alpha=1.0)),
+        "ridge": make_pipeline(StandardScaler(), Ridge(alpha=ridge_alpha)),
         "hist_gradient_boosting": HistGradientBoostingRegressor(
-            max_iter=50,
-            learning_rate=0.05,
-            max_leaf_nodes=31,
-            l2_regularization=1.0,
+            max_iter=hgb_max_iter,
+            learning_rate=hgb_learning_rate,
+            max_leaf_nodes=hgb_max_leaf_nodes,
+            l2_regularization=hgb_l2_regularization,
             random_state=random_state,
         ),
     }
@@ -66,13 +80,25 @@ def fit_baseline_models(
     X_train: pd.DataFrame,
     y_train: Any,
     random_state: int = 13,
+    ridge_alpha: float = 1.0,
+    hgb_max_iter: int = 50,
+    hgb_learning_rate: float = 0.05,
+    hgb_max_leaf_nodes: int = 31,
+    hgb_l2_regularization: float = 1.0,
 ) -> dict[str, Any]:
     """Fit every C01 baseline on the supplied training partition only."""
     _validate_features(X_train)
     target = _validate_target(y_train)
     if len(X_train) != len(target):
         raise ValueError("Feature and target row counts must match")
-    models = build_baseline_models(random_state=random_state)
+    models = build_baseline_models(
+        random_state=random_state,
+        ridge_alpha=ridge_alpha,
+        hgb_max_iter=hgb_max_iter,
+        hgb_learning_rate=hgb_learning_rate,
+        hgb_max_leaf_nodes=hgb_max_leaf_nodes,
+        hgb_l2_regularization=hgb_l2_regularization,
+    )
     for model in models.values():
         model.fit(X_train, target)
     return models

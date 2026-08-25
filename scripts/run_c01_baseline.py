@@ -1,100 +1,107 @@
-"""Run one reproducible C01 C-MAPSS point-baseline evaluation."""
+"""Generate immutable, provenance-complete C01 artifacts."""
 
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import click
 
-from calibrated_reliability.data.labels import add_rul_targets
 from calibrated_reliability.data.loader import load_rul, load_test, load_train
-from calibrated_reliability.data.splitting import split_engine_ids
-from calibrated_reliability.evaluation.metrics import evaluate_endpoint_predictions
-from calibrated_reliability.features.regime import RegimeAwareScaler
-from calibrated_reliability.features.temporal import TemporalFeatureTransformer
-from calibrated_reliability.models.baselines import fit_baseline_models, predict_baselines
+from calibrated_reliability.data.registry import load_registry, validate_file
+from calibrated_reliability.experiments.artifacts import write_c01_run
+from calibrated_reliability.experiments.c01 import C01Config, run_c01
+
+REQUIRED_DATA_FILES = ("train_FD001.txt", "test_FD001.txt", "RUL_FD001.txt")
 
 
-def _git_sha() -> str:
-    """Return the current revision, or an explicit unknown marker."""
+def _git_state() -> tuple[str, bool]:
+    """Return revision and cleanliness, rejecting unverifiable Git state."""
     try:
-        return subprocess.check_output(
+        sha = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL
         ).strip()
-    except (OSError, subprocess.CalledProcessError):
-        return "unknown"
+        dirty = bool(
+            subprocess.check_output(
+                ["git", "status", "--porcelain"], text=True, stderr=subprocess.DEVNULL
+            ).strip()
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError("C01 must run inside a Git repository") from exc
+    if dirty:
+        raise RuntimeError("C01 refuses to run from a dirty Git worktree")
+    return sha, False
+
+
+def _validated_data_records(registry_path: Path, data_root: Path) -> dict[str, dict[str, Any]]:
+    """Verify and return provenance for the exact C01 inputs."""
+    records = {record.filename: record for record in load_registry(registry_path)}
+    missing = set(REQUIRED_DATA_FILES).difference(records)
+    if missing:
+        raise ValueError(f"Registry is missing C01 files: {sorted(missing)}")
+    provenance: dict[str, dict[str, Any]] = {}
+    for filename in REQUIRED_DATA_FILES:
+        record = records[filename]
+        result = validate_file(data_root, record)
+        if not result.valid:
+            raise ValueError(f"Data verification failed for {filename}: {list(result.errors)}")
+        provenance[filename] = {
+            "sha256": record.sha256,
+            "bytes": record.expected_bytes,
+            "rows": record.expected_rows,
+            "engines": record.expected_engines,
+        }
+    return provenance
 
 
 @click.command()
+@click.option(
+    "--config", "config_path", type=click.Path(path_type=Path, exists=True), required=True
+)
+@click.option(
+    "--registry", "registry_path", type=click.Path(path_type=Path, exists=True), required=True
+)
 @click.option("--data-root", type=click.Path(path_type=Path), default=Path("data/raw"))
-@click.option("--output", type=click.Path(path_type=Path), default=Path("outputs/c01"))
-@click.option("--seed", type=int, default=13, show_default=True)
-@click.option("--rul-cap", type=int, default=125, show_default=True)
-def main(data_root: Path, output: Path, seed: int, rul_cap: int) -> None:
-    """Fit C01 on FD001 train engines and evaluate FD001 test endpoints."""
+@click.option("--output-root", type=click.Path(path_type=Path), default=Path("outputs/c01"))
+@click.option("--seed", "requested_seeds", type=int, multiple=True)
+def main(
+    config_path: Path,
+    registry_path: Path,
+    data_root: Path,
+    output_root: Path,
+    requested_seeds: tuple[int, ...],
+) -> None:
+    """Run declared C01 seeds from a clean committed worktree."""
+    sha, _ = _git_state()
+    config = C01Config.from_yaml(config_path.read_text(encoding="utf-8"))
+    seeds = requested_seeds or config.seeds
+    undeclared = set(seeds).difference(config.seeds)
+    if undeclared:
+        raise click.ClickException(f"Undeclared C01 seeds: {sorted(undeclared)}")
+    data_provenance = _validated_data_records(registry_path, data_root)
     train = load_train(data_root / "train_FD001.txt")
     test = load_test(data_root / "test_FD001.txt")
     test_rul = load_rul(data_root / "RUL_FD001.txt")
-    labeled_train = add_rul_targets(train, cap=rul_cap)
-    partitions = split_engine_ids(train["engine_id"], seed=seed)
-    base_ids = partitions["base_train"]
-    base = labeled_train[labeled_train["engine_id"].isin(base_ids)].copy()
-    raw_base = base[train.columns]
-    raw_test = test[train.columns]
-
-    temporal = TemporalFeatureTransformer().fit(raw_base)
-    base_features = temporal.transform(raw_base)
-    test_features = temporal.transform(raw_test)
-    scaler = RegimeAwareScaler(random_state=seed).fit(base_features)
-    X_train = scaler.transform(base_features)
-    X_test = scaler.transform(test_features)
-    models = fit_baseline_models(X_train, base["rul_capped"], random_state=seed)
-    predictions = predict_baselines(models, X_test)
-
-    test_engine_ids = test["engine_id"].drop_duplicates().tolist()
-    if len(test_engine_ids) != len(test_rul):
-        raise ValueError("Test-engine count does not match the RUL file row count")
-    endpoint_rows = test_features.loc[test_features.groupby("engine_id")["cycle"].idxmax()][
-        ["engine_id"]
-    ].reset_index(drop=True)
-    endpoint_rows["y_true"] = test_rul["rul"].to_numpy()
-    metrics: dict[str, dict[str, float]] = {}
-    prediction_frame = endpoint_rows.copy()
-    for name, values in predictions.items():
-        endpoint_values = (
-            test_features.groupby("engine_id")["cycle"]
-            .idxmax()
-            .map(dict(zip(test_features.index, values, strict=True)))
-        )
-        prediction_frame[name] = endpoint_values.to_numpy()
-        metrics[name] = evaluate_endpoint_predictions(
-            prediction_frame.rename(columns={name: "y_pred"})
-        )
-
-    output.mkdir(parents=True, exist_ok=True)
-    prediction_frame.to_csv(output / f"predictions_seed_{seed}.csv", index=False)
-    manifest = {
-        "experiment_id": "C01",
-        "git_sha": _git_sha(),
-        "seed": seed,
-        "rul_cap": rul_cap,
-        "source": "FD001",
-        "target": "FD001",
-        "evaluation_unit": "engine_endpoint",
-        "base_train_engine_count": len(base_ids),
-        "test_engine_count": len(test_engine_ids),
-        "models": list(metrics),
-    }
-    (output / f"manifest_seed_{seed}.json").write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
-    )
-    (output / f"metrics_seed_{seed}.json").write_text(
-        json.dumps(metrics, indent=2) + "\n", encoding="utf-8"
-    )
-    click.echo(json.dumps(metrics, indent=2))
+    for seed in seeds:
+        result = run_c01(train, test, test_rul, config=config, seed=seed)
+        try:
+            run_dir = write_c01_run(
+                output_root,
+                seed,
+                sha,
+                config,
+                result,
+                config_path,
+                registry_path,
+                data_provenance,
+            )
+        except FileExistsError as exc:
+            raise click.ClickException(
+                f"Immutable run directory already exists for seed {seed}"
+            ) from exc
+        click.echo(f"PASS seed={seed} artifact={run_dir}")
 
 
 if __name__ == "__main__":
