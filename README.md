@@ -51,6 +51,7 @@ Run the complete C03 CQR seed set from a clean commit with:
 uv run python scripts/run_c03_cqr.py --config configs/cmapss/cqr.yaml --registry data/registry.yaml
 ```
 
+
 ## Design principles
 
 - preregistered questions and explicit experiment registry;

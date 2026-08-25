@@ -33,6 +33,8 @@ C02 uses the same fixed C01 point models and train-only temporal preprocessing. 
 
 C03 uses conformalized quantile regression with fixed lower/upper HistGradientBoosting quantile models. Alpha `0.10` uses quantiles `0.05/0.95`; alpha `0.05` uses `0.025/0.975`. Quantile models and temporal preprocessing are fit only on base-train rows. Calibration uses one deterministic endpoint per calibration engine and the CQR conformity score `max(lower - truth, truth - upper)`. Intervals are expanded by the finite-sample conformal quantile, remain unbounded, and are evaluated on exactly one official test endpoint per engine. C03 inherits the C02 cap, split, cut-point, seed, feature, bootstrap and provenance rules.
 
+C04 reuses the frozen C02 split-conformal pipeline trained and calibrated on FD001, then evaluates it without target-domain recalibration on FD001, FD002, FD003 and FD004 official test endpoints. FD001→FD002 is operating-condition shift; FD001→FD003 is fault-mode/structural shift; FD001→FD004 is compound/structural shift. Target data is never used for fitting, feature selection, quantile selection or tuning.
+
 ## Primary metrics
 
 RUL: RMSE, MAE, signed error, NASA asymmetric score, interval coverage, interval width, normalized interval score, and engine-level bootstrap confidence intervals. MALT: AUPRC as primary, AUROC, precision, recall, F1, TPR at 5% FPR, Brier score, log loss, marginal and label-conditional conformal coverage, set size, singleton rate, and empty-set rate.
