@@ -30,12 +30,14 @@ from calibrated_reliability.experiments.c04 import C04Config, run_c04_target
     multiple=True,
     type=click.Choice(["FD001", "FD002", "FD003", "FD004"]),
 )
+@click.option("--seed", "requested_seeds", multiple=True, type=int)
 def main(
     config_path: Path,
     registry_path: Path,
     data_root: Path,
     output_root: Path,
     requested_targets: tuple[str, ...],
+    requested_seeds: tuple[int, ...],
 ) -> None:
     """Run all declared C04 target domains and seeds."""
     sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
@@ -43,6 +45,9 @@ def main(
         raise click.ClickException("C04 requires a clean Git worktree")
     config = C04Config.from_yaml(config_path.read_text(encoding="utf-8"))
     targets = requested_targets or config.targets
+    seeds = requested_seeds or config.c02.seeds
+    if set(seeds) - set(config.c02.seeds):
+        raise click.ClickException("Undeclared C04 seed requested")
     records = {record.filename: record for record in load_registry(registry_path)}
     provenance: dict[str, dict[str, Any]] = {}
     for target in targets:
@@ -58,7 +63,7 @@ def main(
     for target in targets:
         test = load_test(data_root / f"test_{target}.txt")
         rul = load_rul(data_root / f"RUL_{target}.txt")
-        for seed in config.c02.seeds:
+        for seed in seeds:
             result = run_c04_target(train, test, rul, config, seed)
             run_dir = write_c04_run(
                 output_root,
