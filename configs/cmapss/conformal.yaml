@@ -12,3 +12,6 @@ calibration:
   min_observed_cycles: 30
   lower_fraction: 0.40
   upper_fraction: 0.90
+bootstrap:
+  n_resamples: 2000
+  confidence_level: 0.95

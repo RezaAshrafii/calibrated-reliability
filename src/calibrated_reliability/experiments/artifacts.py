@@ -149,6 +149,10 @@ def write_c02_run(
             temporary_dir / "predictions.csv",
             result.predictions.to_csv(index=False).encode("utf-8"),
         )
+        artifact_hashes["calibration_scores.csv"] = _write_bytes(
+            temporary_dir / "calibration_scores.csv",
+            result.calibration_scores.to_csv(index=False).encode("utf-8"),
+        )
         artifact_hashes["metrics.json"] = _write_bytes(
             temporary_dir / "metrics.json", _json_bytes(result.metrics)
         )
@@ -200,7 +204,8 @@ def write_c02_run(
             "split_manifest": result.partitions,
             "calibration_cut_points": result.cut_points,
             "preprocessing": {"feature_names": result.feature_names},
-            "models": ["mean", "ridge", "hist_gradient_boosting"],
+            "models": config.as_dict()["models"],
+            "bootstrap": config.as_dict()["bootstrap"],
             "quantiles": result.quantiles,
             "artifacts": artifact_hashes,
         }

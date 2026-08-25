@@ -74,3 +74,45 @@ def interval_metrics(
         "mean_width": float(np.mean(hi - lo)),
         "normalized_interval_score": float(np.mean(score) / target_scale),
     }
+
+
+def bootstrap_interval_metric_cis(
+    y_true: Any,
+    lower: Any,
+    upper: Any,
+    alpha: float,
+    target_scale: float,
+    seed: int,
+    n_resamples: int = 2000,
+    confidence_level: float = 0.95,
+) -> dict[str, dict[str, float]]:
+    """Return deterministic engine-level percentile bootstrap confidence intervals."""
+    truth = pd.to_numeric(pd.Series(y_true), errors="raise").to_numpy(dtype="float64")
+    lo = pd.to_numeric(pd.Series(lower), errors="raise").to_numpy(dtype="float64")
+    hi = pd.to_numeric(pd.Series(upper), errors="raise").to_numpy(dtype="float64")
+    interval_metrics(truth, lo, hi, alpha, target_scale)
+    if seed < 0 or n_resamples < 1 or not 0 < confidence_level < 1:
+        raise ValueError("Bootstrap seed, resample count, or confidence level is invalid")
+    rng = np.random.default_rng(seed)
+    indices = rng.integers(0, len(truth), size=(n_resamples, len(truth)))
+    sampled_truth = truth[indices]
+    sampled_lower = lo[indices]
+    sampled_upper = hi[indices]
+    below = np.maximum(sampled_lower - sampled_truth, 0.0)
+    above = np.maximum(sampled_truth - sampled_upper, 0.0)
+    scores = (sampled_upper - sampled_lower) + (2.0 / alpha) * (below + above)
+    samples = {
+        "coverage": ((sampled_truth >= sampled_lower) & (sampled_truth <= sampled_upper)).mean(
+            axis=1
+        ),
+        "mean_width": (sampled_upper - sampled_lower).mean(axis=1),
+        "normalized_interval_score": scores.mean(axis=1) / target_scale,
+    }
+    tail = (1.0 - confidence_level) / 2.0
+    return {
+        name: {
+            "lower": float(np.quantile(values, tail)),
+            "upper": float(np.quantile(values, 1.0 - tail)),
+        }
+        for name, values in samples.items()
+    }

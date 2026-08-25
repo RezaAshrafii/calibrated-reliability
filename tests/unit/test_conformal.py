@@ -1,16 +1,22 @@
 """Tests for finite-sample split-conformal intervals and C02 orchestration."""
 
+import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from calibrated_reliability.data.loader import COLUMNS
 from calibrated_reliability.evaluation.conformal import (
+    bootstrap_interval_metric_cis,
     conformal_quantile,
     interval_metrics,
     split_conformal_intervals,
 )
-from calibrated_reliability.experiments.c02 import C02Config, run_c02
+from calibrated_reliability.experiments import artifacts as artifacts_module
+from calibrated_reliability.experiments.artifacts import write_c02_run
+from calibrated_reliability.experiments.c02 import C02Config, C02Result, run_c02
 
 
 def config_text() -> str:
@@ -20,16 +26,19 @@ experiment_id: C02
 source: FD001
 target: FD001
 evaluation_unit: engine_endpoint
-seeds: [13]
+seeds: [13, 37, 73, 101, 137]
 alphas: [0.10, 0.05]
 rul_cap: 125
 preprocessing:
-  temporal_windows: [2]
+  temporal_windows: [5, 10, 20]
   variance_threshold: 0.0
 calibration:
-  min_observed_cycles: 2
+  min_observed_cycles: 30
   lower_fraction: 0.40
   upper_fraction: 0.90
+bootstrap:
+  n_resamples: 2000
+  confidence_level: 0.95
 """
 
 
@@ -71,11 +80,43 @@ def test_intervals_and_metrics_are_finite_and_directionally_correct() -> None:
     assert metrics["normalized_interval_score"] > 0.0
 
 
+def test_interval_score_and_bootstrap_are_exact_and_deterministic() -> None:
+    """Both miss directions receive the declared interval-score penalty."""
+    metrics = interval_metrics([0.0, 10.0], [1.0, 8.0], [3.0, 9.0], 0.10, 125.0)
+    assert metrics == {
+        "coverage": 0.0,
+        "mean_width": 1.5,
+        "normalized_interval_score": pytest.approx(21.5 / 125.0),
+    }
+    first = bootstrap_interval_metric_cis(
+        [0.0, 10.0], [1.0, 8.0], [3.0, 9.0], 0.10, 125.0, seed=13
+    )
+    second = bootstrap_interval_metric_cis(
+        [0.0, 10.0], [1.0, 8.0], [3.0, 9.0], 0.10, 125.0, seed=13
+    )
+    assert first == second
+    lower, upper, _ = split_conformal_intervals([0.0], [10.0], [0.0], 0.10)
+    np.testing.assert_allclose(lower, [-10.0])
+    np.testing.assert_allclose(upper, [10.0])
+
+
+def test_c02_config_rejects_undeclared_design_values() -> None:
+    """Sensitivity settings cannot masquerade as the preregistered C02 run."""
+    for changed in [
+        config_text().replace("alphas: [0.10, 0.05]", "alphas: [0.20]"),
+        config_text().replace("rul_cap: 125", "rul_cap: 130"),
+        config_text().replace("seeds: [13, 37, 73, 101, 137]", "seeds: [999]"),
+        config_text().replace("n_resamples: 2000", "n_resamples: 1000"),
+    ]:
+        with pytest.raises(ValueError, match="preregistered"):
+            C02Config.from_yaml(changed)
+
+
 def test_c02_uses_full_training_rul_at_truncated_calibration_endpoint() -> None:
     """Calibration truth is remaining life, not zero at the observed cut point."""
     result = run_c02(
-        trajectory(10, 5),
-        trajectory(2, 3),
+        trajectory(10, 100),
+        trajectory(2, 50),
         pd.DataFrame({"rul": [145, 10]}),
         C02Config.from_yaml(config_text()),
         seed=13,
@@ -92,3 +133,112 @@ def test_c02_uses_full_training_rul_at_truncated_calibration_endpoint() -> None:
     }
     assert all(np.isfinite(value) for value in result.quantiles.values())
     assert all(set(bounds) == {"alpha_0.1", "alpha_0.05"} for bounds in result.metrics.values())
+    assert (result.calibration_scores["rul_raw"] > 0).all()
+    assert np.allclose(
+        result.calibration_scores["rul_raw"],
+        100 - result.calibration_scores["cycle"],
+    )
+    assert {"mean_absolute_residual", "ridge_absolute_residual"}.issubset(
+        result.calibration_scores
+    )
+
+
+def test_c02_rejects_unaligned_official_test_engines() -> None:
+    """Official RUL labels cannot attach to noncontiguous test engine identifiers."""
+    test = trajectory(2, 3)
+    test["engine_id"] = test["engine_id"].replace({1: 2, 2: 3})
+    with pytest.raises(ValueError, match="ordered and contiguous"):
+        run_c02(
+            trajectory(10, 100),
+            test,
+            pd.DataFrame({"rul": [10, 20]}),
+            C02Config.from_yaml(config_text()),
+            seed=13,
+        )
+
+
+def test_c02_artifact_records_scores_models_and_is_immutable(tmp_path: Path) -> None:
+    """C02 artifacts retain the data required to audit conformal quantiles."""
+    config_path = tmp_path / "conformal.yaml"
+    config_path.write_text(config_text(), encoding="utf-8")
+    registry_path = tmp_path / "registry.yaml"
+    registry_path.write_text("version: 1\nfiles: []\n", encoding="utf-8")
+    result = C02Result(
+        predictions=pd.DataFrame({"engine_id": [1], "y_true": [1.0]}),
+        calibration_scores=pd.DataFrame(
+            {"engine_id": [1], "cycle": [30], "rul_capped": [70], "mean_absolute_residual": [2.0]}
+        ),
+        metrics={"mean": {"alpha_0.1": {"coverage": 1.0}}},
+        partitions={"base_train": [1], "calibration": [2], "validation": [3]},
+        cut_points={2: 30},
+        quantiles={"mean_alpha_0.1": 2.0},
+        feature_names=["cycle", "sensor_1"],
+    )
+    output = tmp_path / "outputs"
+    config = C02Config.from_yaml(config_text())
+    run_dir = write_c02_run(
+        output,
+        13,
+        "a" * 40,
+        config,
+        result,
+        config_path,
+        registry_path,
+        {"train_FD001.txt": {"sha256": "b" * 64}},
+    )
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert "calibration_scores.csv" in manifest["artifacts"]
+    assert manifest["models"] == config.as_dict()["models"]
+    assert manifest["bootstrap"] == config.as_dict()["bootstrap"]
+    with pytest.raises(FileExistsError):
+        write_c02_run(
+            output,
+            13,
+            "a" * 40,
+            config,
+            result,
+            config_path,
+            registry_path,
+            {"train_FD001.txt": {"sha256": "b" * 64}},
+        )
+
+
+def test_c02_artifact_write_cleans_partial_directory_on_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed C02 write leaves neither a published nor a temporary run directory."""
+    config_path = tmp_path / "conformal.yaml"
+    config_path.write_text(config_text(), encoding="utf-8")
+    registry_path = tmp_path / "registry.yaml"
+    registry_path.write_text("version: 1\nfiles: []\n", encoding="utf-8")
+    config = C02Config.from_yaml(config_text())
+    result = C02Result(
+        predictions=pd.DataFrame({"engine_id": [1], "y_true": [1.0]}),
+        calibration_scores=pd.DataFrame({"engine_id": [1], "cycle": [30]}),
+        metrics={},
+        partitions={"base_train": [1], "calibration": [2], "validation": [3]},
+        cut_points={2: 30},
+        quantiles={},
+        feature_names=["cycle", "sensor_1"],
+    )
+    original_write = artifacts_module._write_bytes
+
+    def fail_on_metrics(path: Path, content: bytes) -> str:
+        if path.name == "metrics.json":
+            raise OSError("simulated artifact failure")
+        return original_write(path, content)
+
+    monkeypatch.setattr(artifacts_module, "_write_bytes", fail_on_metrics)
+    output = tmp_path / "outputs"
+    with pytest.raises(OSError, match="simulated artifact failure"):
+        write_c02_run(
+            output,
+            13,
+            "a" * 40,
+            config,
+            result,
+            config_path,
+            registry_path,
+            {"train_FD001.txt": {"sha256": "b" * 64}},
+        )
+    assert list(output.iterdir()) == []
