@@ -15,4 +15,6 @@ The repository is designed so data, configuration, code revision, environment, s
 
 7. Retain the immutable seed-specific directories under `outputs/c01/`. Each directory includes raw and clipped endpoint predictions, metrics, the resolved configuration, split manifest, log, data/config/lock hashes, environment versions, and the exact clean Git revision.
 
+8. Run C02 from the same clean commit with `uv run python scripts/run_c02_conformal.py --config configs/cmapss/conformal.yaml --registry data/registry.yaml`; retain its seed-specific immutable directories under `outputs/c02/`, including calibration cut points, quantiles, interval predictions, metrics and provenance.
+
 C01 artifacts are generated locally because the official raw dataset is intentionally excluded from Git. Generated numbers remain research artifacts rather than conclusions until independently audited.
