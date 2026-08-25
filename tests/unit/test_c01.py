@@ -2,10 +2,12 @@
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
 
+import calibrated_reliability.experiments.artifacts as artifacts_module
 from calibrated_reliability.data.loader import COLUMNS
 from calibrated_reliability.experiments.artifacts import write_c01_run
 from calibrated_reliability.experiments.c01 import C01Config, C01Result, run_c01
@@ -145,6 +147,7 @@ def test_artifact_manifest_is_complete_and_run_directory_is_immutable(tmp_path: 
     )
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["git"] == {"dirty": False, "sha": "a" * 40}
+    assert manifest["lockfile"]["path"] == "uv.lock"
     assert {"configuration", "data", "environment", "lockfile", "split_manifest"}.issubset(
         manifest
     )
@@ -162,3 +165,40 @@ def test_artifact_manifest_is_complete_and_run_directory_is_immutable(tmp_path: 
             registry_path,
             {"train_FD001.txt": {"sha256": "b" * 64}},
         )
+
+
+def test_artifact_write_cleans_partial_directory_on_failure(tmp_path: Path) -> None:
+    """A failed write leaves no partial run directory or temporary sibling."""
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(config_text(), encoding="utf-8")
+    registry_path = tmp_path / "registry.yaml"
+    registry_path.write_text("version: 1\nfiles: []\n", encoding="utf-8")
+    result = C01Result(
+        predictions=pd.DataFrame({"engine_id": [1], "y_true": [125.0]}),
+        metrics={"mean": {"rmse": 0.0}},
+        partitions={"base_train": [1], "calibration": [2], "validation": [3]},
+        selected_sensors=["sensor_1"],
+        feature_names=["cycle", "sensor_1"],
+    )
+    output = tmp_path / "outputs"
+    original_write = artifacts_module._write_bytes
+
+    def fail_on_manifest(path: Path, content: bytes) -> str:
+        if path.name == "manifest.json":
+            raise OSError("simulated manifest failure")
+        return original_write(path, content)
+
+    with patch.object(artifacts_module, "_write_bytes", side_effect=fail_on_manifest):
+        with pytest.raises(OSError, match="simulated manifest failure"):
+            write_c01_run(
+                output,
+                13,
+                "c" * 40,
+                C01Config.from_yaml(config_text()),
+                result,
+                config_path,
+                registry_path,
+                {"train_FD001.txt": {"sha256": "b" * 64}},
+            )
+    assert not (output / "C01_cccccccccccc_seed_13").exists()
+    assert list(output.iterdir()) == []
