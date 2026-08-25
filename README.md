@@ -16,7 +16,7 @@ The project evaluates point and interval predictions across C-MAPSS operating/fa
 uv sync --locked --extra dev
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy src
+uv run mypy --python-version 3.13 src
 uv run mypy --no-site-packages --disable-error-code=untyped-decorator scripts
 uv run pytest -q
 ```

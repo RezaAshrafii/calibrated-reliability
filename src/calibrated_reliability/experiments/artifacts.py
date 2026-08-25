@@ -200,6 +200,7 @@ def write_c02_run(
             "split_manifest": result.partitions,
             "calibration_cut_points": result.cut_points,
             "preprocessing": {"feature_names": result.feature_names},
+            "models": ["mean", "ridge", "hist_gradient_boosting"],
             "quantiles": result.quantiles,
             "artifacts": artifact_hashes,
         }
