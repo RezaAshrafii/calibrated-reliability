@@ -84,6 +84,8 @@ def cqr_intervals(
         raise ValueError("CQR prediction arrays must have equal non-zero length")
     if not np.isfinite(lower).all() or not np.isfinite(upper).all():
         raise ValueError("CQR prediction arrays must be finite")
+    if (lower > upper).any():
+        raise ValueError("CQR lower predictions cannot exceed upper predictions")
     return lower - q, upper + q, q
 
 

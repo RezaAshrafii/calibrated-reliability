@@ -49,6 +49,15 @@ def _strict_int(value: Any, name: str) -> int:
     return value
 
 
+def _strict_float(value: Any, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be numeric")
+    result = float(value)
+    if not np.isfinite(result):
+        raise ValueError(f"{name} must be finite")
+    return result
+
+
 @dataclass(frozen=True)
 class C03Config:
     """Validated C03 configuration."""
@@ -115,6 +124,12 @@ class C03Config:
         seeds = raw["seeds"]
         alphas = raw["alphas"]
         windows = preprocessing["temporal_windows"]
+        if (
+            not isinstance(seeds, list)
+            or not isinstance(alphas, list)
+            or not isinstance(windows, list)
+        ):
+            raise ValueError("C03 seeds, alphas and temporal windows must be lists")
         if not all(isinstance(x, int) and not isinstance(x, bool) for x in seeds):
             raise ValueError("C03 seeds must be integers")
         config = cls(
@@ -123,17 +138,21 @@ class C03Config:
             target=str(raw["target"]),
             evaluation_unit=str(raw["evaluation_unit"]),
             seeds=tuple(seeds),
-            alphas=tuple(float(x) for x in alphas),
+            alphas=tuple(_strict_float(x, "alpha") for x in alphas),
             rul_cap=_strict_int(raw["rul_cap"], "rul_cap"),
             temporal_windows=tuple(_strict_int(x, "temporal window") for x in windows),
-            variance_threshold=float(preprocessing["variance_threshold"]),
+            variance_threshold=_strict_float(
+                preprocessing["variance_threshold"], "variance_threshold"
+            ),
             min_observed_cycles=_strict_int(
                 calibration["min_observed_cycles"], "min_observed_cycles"
             ),
-            lower_fraction=float(calibration["lower_fraction"]),
-            upper_fraction=float(calibration["upper_fraction"]),
+            lower_fraction=_strict_float(calibration["lower_fraction"], "lower_fraction"),
+            upper_fraction=_strict_float(calibration["upper_fraction"], "upper_fraction"),
             bootstrap_resamples=_strict_int(bootstrap["n_resamples"], "bootstrap.n_resamples"),
-            bootstrap_confidence_level=float(bootstrap["confidence_level"]),
+            bootstrap_confidence_level=_strict_float(
+                bootstrap["confidence_level"], "bootstrap.confidence_level"
+            ),
             model_spec=dict(models),
         )
         if (
@@ -223,7 +242,11 @@ def run_c03(
     if test_ids != list(range(1, len(test_rul) + 1)):
         raise ValueError("Test engine IDs must be ordered and contiguous from 1 through RUL rows")
     partitions = split_engine_ids(train["engine_id"], seed=seed)
-    raw_base = train[train.engine_id.isin(partitions["base_train"])][COLUMNS].copy()
+    raw_base = (
+        train[train.engine_id.isin(partitions["base_train"])][COLUMNS]
+        .sort_values(["engine_id", "cycle"], kind="stable")
+        .copy()
+    )
     full_labeled = add_rul_targets(train[COLUMNS].copy(), cap=config.rul_cap)
     base_labeled = add_rul_targets(raw_base, cap=config.rul_cap)
     cut_points = generate_cut_points(
@@ -243,6 +266,10 @@ def run_c03(
     base_features = temporal.transform(raw_base)
     calibration_features = temporal.transform(calibration_raw)
     test_features = temporal.transform(test[COLUMNS])
+    if not base_features[["engine_id", "cycle"]].equals(
+        raw_base[["engine_id", "cycle"]].reset_index(drop=True)
+    ):
+        raise ValueError("Training feature order does not match training target order")
     models = _fit_quantile_models(
         base_features.drop(columns=["engine_id"]), base_labeled.rul_capped, config, seed
     )

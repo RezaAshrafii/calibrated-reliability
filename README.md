@@ -4,7 +4,7 @@ Reproducible study of calibrated predictive reliability under structured distrib
 
 ## Status
 
-**Phase 0–6 complete; Phase 7 implements the C02 split-conformal runner.** Shift-matrix and MALT phases remain intentionally unimplemented.
+**Phases 0–8 complete through C03; shift-matrix and MALT phases remain intentionally unimplemented.**
 
 ## Research scope
 
@@ -33,6 +33,12 @@ Run the complete C02 split-conformal seed set from a clean commit with:
 
 ```bash
 uv run python scripts/run_c02_conformal.py --config configs/cmapss/conformal.yaml --registry data/registry.yaml
+```
+
+Run the complete C03 CQR seed set from a clean commit with:
+
+```bash
+uv run python scripts/run_c03_cqr.py --config configs/cmapss/cqr.yaml --registry data/registry.yaml
 ```
 
 ## Design principles
