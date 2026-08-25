@@ -2,9 +2,17 @@
 
 Reproducible study of calibrated predictive reliability under structured distribution shift, using turbofan remaining-useful-life (RUL) prediction and an agentic monitoring case study.
 
+[![CI](https://github.com/RezaAshrafii/calibrated-reliability/actions/workflows/ci.yml/badge.svg)](https://github.com/RezaAshrafii/calibrated-reliability/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+> This is a reproducible research repository, not a claim of SOTA or universal safety guarantees. No result is reported until it is generated from a verified artifact.
+
 ## Status
 
-**Phases 0–8 complete through C03; shift-matrix and MALT phases remain intentionally unimplemented.**
+**Implemented:** C01 point-prediction baselines, leakage-safe temporal features, engine-aware splits, C02 split-conformal intervals, C03 conformalized quantile regression, immutable provenance-tracked artifacts, and the CI quality gate.
+
+**In progress:** C-MAPSS shift matrix, sensitivity analysis, and the MALT study. These are intentionally not presented as implemented results.
 
 ## Research scope
 
@@ -22,6 +30,8 @@ uv run pytest -q
 ```
 
 Raw data belongs in `data/raw/` and is intentionally ignored by Git. See `docs/protocol.md` and `REPRODUCIBILITY.md` before running experiments.
+
+The repository contains code, protocols and test fixtures. Official C-MAPSS raw files are never committed; obtain them from the source recorded in `data/registry.yaml` and verify their hashes first.
 
 After data verification and from a clean commit, run the complete C01 seed set with:
 
@@ -48,6 +58,10 @@ uv run python scripts/run_c03_cqr.py --config configs/cmapss/cqr.yaml --registry
 - immutable, provenance-tracked experiment artifacts;
 - reported uncertainty and limitations, not only point estimates;
 - no fabricated numbers, citations, or conclusions.
+
+## Research deliverables
+
+The experiment protocol and planned output format live in [docs/protocol.md](docs/protocol.md), [docs/experiment_registry.md](docs/experiment_registry.md), and [docs/RESULTS.md](docs/RESULTS.md). The results document is deliberately a template until C01/C02 artifacts are generated and independently checked.
 
 ## Citation
 
