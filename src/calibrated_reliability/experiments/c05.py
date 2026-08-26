@@ -36,6 +36,8 @@ class C05Config:
     weighting_features: tuple[str, ...]
     logistic_c: float
     logistic_max_iter: int
+    weight_clip_min: float
+    weight_clip_max: float
 
     @classmethod
     def from_yaml(cls, text: str) -> C05Config:
@@ -69,6 +71,8 @@ class C05Config:
             "features",
             "logistic_c",
             "max_iter",
+            "clip_min",
+            "clip_max",
         }:
             raise ValueError("C05 weighting schema mismatch")
         if weighting["method"] != "logistic_density_ratio" or tuple(
@@ -84,6 +88,12 @@ class C05Config:
             or weighting["max_iter"] < 1
         ):
             raise ValueError("C05 logistic configuration is invalid")
+        if (
+            not isinstance(weighting["clip_min"], (int, float))
+            or not isinstance(weighting["clip_max"], (int, float))
+            or not 0 < float(weighting["clip_min"]) < float(weighting["clip_max"]) <= 1.0
+        ):
+            raise ValueError("C05 clipping configuration is invalid")
         c02_raw = dict(raw)
         c02_raw.pop("targets")
         c02_raw.pop("weighting")
@@ -97,6 +107,8 @@ class C05Config:
             tuple(weighting["features"]),
             float(weighting["logistic_c"]),
             weighting["max_iter"],
+            float(weighting["clip_min"]),
+            float(weighting["clip_max"]),
         )
 
     def as_dict(self) -> dict[str, Any]:
@@ -108,6 +120,8 @@ class C05Config:
             "features": list(self.weighting_features),
             "logistic_c": self.logistic_c,
             "max_iter": self.logistic_max_iter,
+            "clip_min": self.weight_clip_min,
+            "clip_max": self.weight_clip_max,
         }
         return result
 
@@ -167,6 +181,20 @@ def _density_ratio(source: pd.DataFrame, target: pd.DataFrame) -> tuple[np.ndarr
     return source_weights, target_weights
 
 
+def _clip_and_normalize_weights(
+    calibration_weights: np.ndarray,
+    target_weights: np.ndarray,
+    clip_min: float,
+    clip_max: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Bound density ratios and normalize calibration mass to its sample count."""
+    clipped_calibration = np.clip(calibration_weights, clip_min, clip_max)
+    scale = float(clipped_calibration.mean())
+    normalized_calibration = clipped_calibration / scale
+    normalized_target = np.clip(target_weights / scale, clip_min, clip_max)
+    return normalized_calibration, normalized_target
+
+
 def run_c05_target(
     pipeline: C02FittedPipeline,
     target_test: pd.DataFrame,
@@ -192,6 +220,12 @@ def run_c05_target(
         endpoint_settings,
         config.logistic_c,
         config.logistic_max_iter,
+    )
+    calibration_weights, target_weights = _clip_and_normalize_weights(
+        calibration_weights,
+        target_weights,
+        config.weight_clip_min,
+        config.weight_clip_max,
     )
     truth_raw = target_rul["rul"].astype("float64").to_numpy()
     truth = np.clip(truth_raw, 0.0, config.c02.rul_cap)
@@ -268,5 +302,7 @@ def run_c05_target(
             "calibration_effective_sample_size": float(
                 calibration_weights.sum() ** 2 / np.square(calibration_weights).sum()
             ),
+            "clip_min": config.weight_clip_min,
+            "clip_max": config.weight_clip_max,
         },
     )

@@ -5,6 +5,7 @@ import pytest
 
 from calibrated_reliability.experiments.c05 import (
     C05Config,
+    _clip_and_normalize_weights,
     _density_ratio,
     _weighted_quantile,
 )
@@ -31,6 +32,8 @@ weighting:
   features: [op_setting_1, op_setting_2, op_setting_3]
   logistic_c: 1.0
   max_iter: 1000
+  clip_min: 0.05
+  clip_max: 1.0
 bootstrap:
   n_resamples: 2000
   confidence_level: 0.95
@@ -52,6 +55,15 @@ def test_weighted_quantile_uses_calibration_and_test_weight() -> None:
 
 def test_weighted_quantile_returns_infinity_for_test_mass_boundary() -> None:
     assert np.isinf(_weighted_quantile([1.0, 2.0], [1.0, 1.0], 100.0, 0.10))
+
+
+def test_clipped_weights_keep_fixed_design_quantiles_finite() -> None:
+    calibration, target = _clip_and_normalize_weights(
+        np.array([0.001, 100.0, *([1.0] * 18)]), np.array([1000.0]), 0.05, 1.0
+    )
+    assert calibration.mean() == pytest.approx(1.0)
+    assert target.max() <= 1.0
+    assert np.isfinite(_weighted_quantile(np.arange(20.0), calibration, target[0], 0.05))
 
 
 def test_density_ratio_uses_only_operating_settings() -> None:
