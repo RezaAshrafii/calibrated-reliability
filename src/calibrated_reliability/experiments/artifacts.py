@@ -421,6 +421,8 @@ def write_c05_run(
             "target": target,
             "evaluation_unit": "engine_endpoint",
             "seed": seed,
+            "rul_cap": config.c02.rul_cap,
+            "alphas": list(config.c02.alphas),
             "git": {"sha": sha, "dirty": False},
             "data": data_provenance,
             "configuration": {
