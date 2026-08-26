@@ -6,8 +6,7 @@ import pytest
 
 from calibrated_reliability.experiments.c04 import (
     C04Config,
-    fit_c04_seed,
-    run_c04_target_frozen,
+    run_c04_seed,
 )
 
 
@@ -39,8 +38,10 @@ bootstrap:
         C04Config.from_yaml(text.replace("FD004", "FD001"))
 
 
-def test_c04_frozen_evaluation_does_not_fit_again(monkeypatch: pytest.MonkeyPatch) -> None:
-    config = C04Config((), SimpleNamespace(seeds=(13,)))  # type: ignore[arg-type]
+def test_c04_seed_fits_once_and_reuses_one_pipeline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = C04Config(("FD001", "FD002", "FD003", "FD004"), SimpleNamespace(seeds=(13,)))  # type: ignore[arg-type]
     calls = {"fit": 0, "evaluate": 0}
     sentinel = object()
 
@@ -59,7 +60,17 @@ def test_c04_frozen_evaluation_does_not_fit_again(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(
         "calibrated_reliability.experiments.c04.evaluate_c02_pipeline", fake_evaluate
     )
-    pipeline = fit_c04_seed(object(), config, 13)
-    run_c04_target_frozen(pipeline, object(), object(), config, 13)
-    run_c04_target_frozen(pipeline, object(), object(), config, 13)
-    assert calls == {"fit": 1, "evaluate": 2}
+    result = run_c04_seed(
+        object(),
+        {target: (object(), object()) for target in config.targets},
+        config,
+        13,
+    )
+    assert set(result) == set(config.targets)
+    assert calls == {"fit": 1, "evaluate": 4}
+
+
+def test_c04_seed_rejects_missing_or_reordered_target_data() -> None:
+    config = C04Config(("FD001", "FD002", "FD003", "FD004"), SimpleNamespace(seeds=(13,)))  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="declared target order"):
+        run_c04_seed(object(), {"FD001": (object(), object())}, config, 13)

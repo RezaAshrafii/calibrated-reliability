@@ -240,7 +240,7 @@ def _aligned_truth_at_endpoints(labeled: pd.DataFrame, endpoints: pd.DataFrame) 
     return aligned
 
 
-@dataclass
+@dataclass(frozen=True)
 class C02FittedPipeline:
     """Frozen C02 fit/calibration state reusable across target domains."""
 

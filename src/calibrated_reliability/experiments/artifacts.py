@@ -330,6 +330,10 @@ def write_c04_run(
                 {"seed": seed, "partitions": result.partitions, "cut_points": result.cut_points}
             ),
             "resolved_config.json": _json_bytes(config.as_dict()),
+            "run.log": (
+                f"experiment_id=C04\nseed={seed}\ntarget={target}\ngit_sha={sha}\n"
+                f"status=completed\nendpoint_rows={len(result.predictions)}\n"
+            ).encode(),
         }
         for filename, content in contents.items():
             artifact_hashes[filename] = _write_bytes(temporary_dir / filename, content)
@@ -354,6 +358,7 @@ def write_c04_run(
                 "path": "uv.lock",
                 "sha256": compute_sha256(_repository_root() / "uv.lock"),
             },
+            "environment": _environment(),
             "split_manifest": result.partitions,
             "calibration_cut_points": result.cut_points,
             "preprocessing": {"feature_names": result.feature_names},

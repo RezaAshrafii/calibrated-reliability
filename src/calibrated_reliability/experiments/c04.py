@@ -65,23 +65,6 @@ class C04Config:
         return result
 
 
-def run_c04_target(
-    source_train: Any,
-    target_test: Any,
-    target_rul: Any,
-    config: C04Config,
-    seed: int,
-) -> C02Result:
-    """Evaluate one target domain using a supplied frozen C02 pipeline."""
-    return evaluate_c02_pipeline(
-        fit_c02_pipeline(source_train, config.c02, seed),
-        target_test,
-        target_rul,
-        config.c02,
-        seed,
-    )
-
-
 def run_c04_target_frozen(
     pipeline: C02FittedPipeline,
     target_test: Any,
@@ -98,3 +81,19 @@ def run_c04_target_frozen(
 def fit_c04_seed(source_train: Any, config: C04Config, seed: int) -> C02FittedPipeline:
     """Fit the FD001 C02 state exactly once for a C04 seed."""
     return fit_c02_pipeline(source_train, config.c02, seed)
+
+
+def run_c04_seed(
+    source_train: Any,
+    target_data: dict[str, tuple[Any, Any]],
+    config: C04Config,
+    seed: int,
+) -> dict[str, C02Result]:
+    """Fit once on FD001, then evaluate the same frozen state on every target."""
+    if tuple(target_data) != config.targets:
+        raise ValueError("C04 target data must match the declared target order")
+    pipeline = fit_c04_seed(source_train, config, seed)
+    return {
+        target: run_c04_target_frozen(pipeline, test, rul, config, seed)
+        for target, (test, rul) in target_data.items()
+    }
