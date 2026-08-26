@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -90,6 +91,33 @@ class C06Config:
             "seed_policy",
         }:
             raise ValueError("C06 bootstrap schema mismatch")
+        if (
+            not isinstance(raw["seeds"], list)
+            or any(isinstance(v, bool) or not isinstance(v, int) for v in raw["seeds"])
+            or not isinstance(raw["alphas"], list)
+            or any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in raw["alphas"])
+            or not isinstance(preprocessing["temporal_windows"], list)
+            or any(
+                isinstance(v, bool) or not isinstance(v, int)
+                for v in preprocessing["temporal_windows"]
+            )
+            or isinstance(preprocessing["variance_threshold"], bool)
+            or not isinstance(preprocessing["variance_threshold"], (int, float))
+            or isinstance(bootstrap["n_resamples"], bool)
+            or not isinstance(bootstrap["n_resamples"], int)
+            or isinstance(bootstrap["confidence_level"], bool)
+            or not isinstance(bootstrap["confidence_level"], (int, float))
+        ):
+            raise ValueError("C06 numeric configuration types are invalid")
+        numeric_values = [
+            *raw["alphas"],
+            preprocessing["variance_threshold"],
+            bootstrap["confidence_level"],
+        ]
+        if not all(math.isfinite(float(value)) for value in numeric_values):
+            raise ValueError("C06 numeric configuration values must be finite")
+        if not 0 < float(bootstrap["confidence_level"]) < 1:
+            raise ValueError("C06 confidence level is invalid")
         if not isinstance(conditions, list) or len(conditions) != len(C06_CONDITIONS):
             raise ValueError("C06 conditions schema mismatch")
         parsed: list[C06Condition] = []
@@ -126,11 +154,11 @@ class C06Config:
             )
         config = cls(
             tuple(raw["seeds"]),
-            tuple(float(v) for v in raw["alphas"]),
+            tuple(raw["alphas"]),
             tuple(preprocessing["temporal_windows"]),
-            float(preprocessing["variance_threshold"]),
+            preprocessing["variance_threshold"],
             bootstrap["n_resamples"],
-            float(bootstrap["confidence_level"]),
+            bootstrap["confidence_level"],
             tuple(parsed),
         )
         if (

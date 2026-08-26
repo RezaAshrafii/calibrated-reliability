@@ -73,3 +73,17 @@ def test_c06_rejects_design_drift(replacement: str) -> None:
         text = text.replace("lower_fraction: 0.40", replacement, 1)
     with pytest.raises(ValueError):
         C06Config.from_yaml(text)
+
+
+@pytest.mark.parametrize(
+    ("needle", "replacement"),
+    [
+        ("alphas: [0.10, 0.05]", 'alphas: ["0.10", 0.05]'),
+        ("variance_threshold: 0.0", 'variance_threshold: "0.0"'),
+        ("confidence_level: 0.95", 'confidence_level: "0.95"'),
+        ("confidence_level: 0.95", "confidence_level: .nan"),
+    ],
+)
+def test_c06_rejects_lossy_or_nonfinite_numeric_values(needle: str, replacement: str) -> None:
+    with pytest.raises(ValueError):
+        C06Config.from_yaml(c06_text().replace(needle, replacement, 1))
