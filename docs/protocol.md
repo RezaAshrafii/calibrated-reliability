@@ -35,6 +35,8 @@ C03 uses conformalized quantile regression with fixed lower/upper HistGradientBo
 
 C04 reuses the frozen C02 split-conformal pipeline trained and calibrated on FD001, then evaluates it without target-domain recalibration on FD001, FD002, FD003 and FD004 official test endpoints. FD001→FD002 is operating-condition shift; FD001→FD003 is fault-mode/structural shift; FD001→FD004 is compound/structural shift. Target data is never used for fitting, feature selection, quantile selection or tuning.
 
+C05 is a transductive weighted-conformal sensitivity experiment from FD001 to FD002, FD003 and FD004. It reuses the frozen FD001 C02 transformer, point models and calibration residuals. Unlabeled target endpoint operating settings may be used only to estimate target/source density ratios; target RUL is never used for fitting or weighting. Each target endpoint uses its own ratio in the weighted conformal quantile. If an endpoint's required quantile falls in the target point's infinity mass, the run fails closed rather than reporting a finite interval.
+
 ## Primary metrics
 
 RUL: RMSE, MAE, signed error, NASA asymmetric score, interval coverage, interval width, normalized interval score, and engine-level bootstrap confidence intervals. MALT: AUPRC as primary, AUROC, precision, recall, F1, TPR at 5% FPR, Brier score, log loss, marginal and label-conditional conformal coverage, set size, singleton rate, and empty-set rate.

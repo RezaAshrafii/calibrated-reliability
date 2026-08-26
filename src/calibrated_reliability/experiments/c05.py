@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
 
 from calibrated_reliability.data.loader import COLUMNS, OP_SETTING_COLUMNS
 from calibrated_reliability.evaluation.conformal import (
@@ -33,6 +34,8 @@ class C05Config:
     c02: Any
     weighting_method: str
     weighting_features: tuple[str, ...]
+    logistic_c: float
+    logistic_max_iter: int
 
     @classmethod
     def from_yaml(cls, text: str) -> C05Config:
@@ -61,19 +64,40 @@ class C05Config:
         ):
             raise ValueError("C05 source or targets are invalid")
         weighting = raw["weighting"]
-        if not isinstance(weighting, dict) or set(weighting) != {"method", "features"}:
+        if not isinstance(weighting, dict) or set(weighting) != {
+            "method",
+            "features",
+            "logistic_c",
+            "max_iter",
+        }:
             raise ValueError("C05 weighting schema mismatch")
         if weighting["method"] != "logistic_density_ratio" or tuple(
             weighting["features"]
         ) != tuple(OP_SETTING_COLUMNS):
             raise ValueError("C05 weighting design is not preregistered")
+        if (
+            isinstance(weighting["logistic_c"], bool)
+            or not isinstance(weighting["logistic_c"], (int, float))
+            or float(weighting["logistic_c"]) <= 0
+            or isinstance(weighting["max_iter"], bool)
+            or not isinstance(weighting["max_iter"], int)
+            or weighting["max_iter"] < 1
+        ):
+            raise ValueError("C05 logistic configuration is invalid")
         c02_raw = dict(raw)
         c02_raw.pop("targets")
         c02_raw.pop("weighting")
         c02_raw["experiment_id"] = "C02"
         c02_raw["target"] = "FD001"
         c02 = C02Config.from_yaml(yaml.safe_dump(c02_raw, sort_keys=False))
-        return cls(C05_TARGETS, c02, weighting["method"], tuple(weighting["features"]))
+        return cls(
+            C05_TARGETS,
+            c02,
+            weighting["method"],
+            tuple(weighting["features"]),
+            float(weighting["logistic_c"]),
+            weighting["max_iter"],
+        )
 
     def as_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = dict(self.c02.as_dict())
@@ -82,6 +106,8 @@ class C05Config:
         result["weighting"] = {
             "method": self.weighting_method,
             "features": list(self.weighting_features),
+            "logistic_c": self.logistic_c,
+            "max_iter": self.logistic_max_iter,
         }
         return result
 
@@ -101,20 +127,44 @@ def _weighted_quantile(scores: Any, weights: Any, test_weight: float, alpha: flo
     cumulative = np.cumsum(calibration_weights[order])
     threshold = (1.0 - alpha) * (calibration_weights.sum() + test_weight)
     index = int(np.searchsorted(cumulative, threshold, side="left"))
-    return float(values[order[min(index, len(order) - 1)]])
+    if index == len(order):
+        return float("inf")
+    return float(values[order[index]])
 
 
-def _density_ratio(source: pd.DataFrame, target: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+def _density_ratio_details(
+    source: pd.DataFrame, target: pd.DataFrame, logistic_c: float, max_iter: int
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
     """Estimate target/source density ratios from operating settings only."""
     x_source = source[OP_SETTING_COLUMNS].to_numpy(dtype="float64")
     x_target = target[OP_SETTING_COLUMNS].to_numpy(dtype="float64")
-    x = np.vstack([x_source, x_target])
+    scaler = StandardScaler().fit(np.vstack([x_source, x_target]))
+    x = scaler.transform(np.vstack([x_source, x_target]))
     labels = np.concatenate([np.zeros(len(x_source)), np.ones(len(x_target))])
-    model = LogisticRegression(random_state=0, max_iter=1000, solver="lbfgs").fit(x, labels)
+    model = LogisticRegression(
+        random_state=0, max_iter=max_iter, solver="lbfgs", C=logistic_c
+    ).fit(x, labels)
     probabilities = model.predict_proba(x)[:, 1]
     odds = np.clip(probabilities, 1e-8, 1.0 - 1e-8) / np.clip(1.0 - probabilities, 1e-8, 1.0)
     ratios = odds * (len(x_source) / len(x_target))
-    return ratios[: len(x_source)], ratios[len(x_source) :]
+    details = {
+        "features": list(OP_SETTING_COLUMNS),
+        "logistic_c": logistic_c,
+        "max_iter": max_iter,
+        "coef": model.coef_.ravel().tolist(),
+        "intercept": float(model.intercept_[0]),
+        "scaler_mean": scaler.mean_.tolist(),
+        "scaler_scale": scaler.scale_.tolist(),
+        "source_count": len(x_source),
+        "target_count": len(x_target),
+    }
+    return ratios[: len(x_source)], ratios[len(x_source) :], details
+
+
+def _density_ratio(source: pd.DataFrame, target: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+    """Estimate deterministic target/source ratios for unit-level tests."""
+    source_weights, target_weights, _ = _density_ratio_details(source, target, 1.0, 1000)
+    return source_weights, target_weights
 
 
 def run_c05_target(
@@ -137,8 +187,11 @@ def run_c05_target(
     endpoint_settings = features.loc[
         features.groupby("engine_id", sort=True)["cycle"].idxmax(), OP_SETTING_COLUMNS
     ].reset_index(drop=True)
-    calibration_weights, target_weights = _density_ratio(
-        pipeline.calibration_operating_settings, endpoint_settings
+    calibration_weights, target_weights, density_ratio = _density_ratio_details(
+        pipeline.calibration_operating_settings,
+        endpoint_settings,
+        config.logistic_c,
+        config.logistic_max_iter,
     )
     truth_raw = target_rul["rul"].astype("float64").to_numpy()
     truth = np.clip(truth_raw, 0.0, config.c02.rul_cap)
@@ -146,9 +199,9 @@ def run_c05_target(
     predictions = predict_baselines(pipeline.models, features.drop(columns=["engine_id"]))
     calibration_scores = pipeline.calibration_scores.copy(deep=True)
     calibration_scores["density_ratio_weight"] = calibration_weights
-    target_weight = float(np.mean(np.asarray(target_weights, dtype="float64")))
+    frame["density_ratio_weight"] = target_weights
     metrics: dict[str, dict[str, dict[str, Any]]] = {}
-    quantiles: dict[str, float] = {}
+    quantiles: dict[str, Any] = {}
     for name, values in predictions.items():
         endpoint_values = (
             pd.Series(values, index=features.index)
@@ -160,13 +213,27 @@ def run_c05_target(
         metrics[name] = {}
         for alpha in config.c02.alphas:
             key = f"alpha_{alpha:g}"
-            q = _weighted_quantile(
-                calibration_scores[f"{name}_absolute_residual"],
-                calibration_weights,
-                target_weight,
-                alpha,
+            q = np.array(
+                [
+                    _weighted_quantile(
+                        calibration_scores[f"{name}_absolute_residual"],
+                        calibration_weights,
+                        float(weight),
+                        alpha,
+                    )
+                    for weight in target_weights
+                ]
             )
-            quantiles[f"{name}_{key}"] = q
+            if not np.isfinite(q).all():
+                raise ValueError(
+                    "Weighted conformal quantile is infinite; finite C05 interval unavailable"
+                )
+            frame[f"{name}_{key}_quantile"] = q
+            quantiles[f"{name}_{key}"] = {
+                "min": float(q.min()),
+                "max": float(q.max()),
+                "unique_count": int(np.unique(q).size),
+            }
             lower, upper = frame[name].to_numpy() - q, frame[name].to_numpy() + q
             frame[f"{name}_{key}_lower"] = lower
             frame[f"{name}_{key}_upper"] = upper
@@ -192,4 +259,14 @@ def run_c05_target(
         cut_points=pipeline.cut_points,
         quantiles=quantiles,
         feature_names=list(pipeline.feature_names),
+        weighting={
+            **density_ratio,
+            "calibration_weight_sum": float(calibration_weights.sum()),
+            "target_weight_min": float(target_weights.min()),
+            "target_weight_max": float(target_weights.max()),
+            "target_weight_mean": float(target_weights.mean()),
+            "calibration_effective_sample_size": float(
+                calibration_weights.sum() ** 2 / np.square(calibration_weights).sum()
+            ),
+        },
     )

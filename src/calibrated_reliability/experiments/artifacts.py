@@ -345,6 +345,8 @@ def write_c04_run(
             "target": target,
             "evaluation_unit": "engine_endpoint",
             "seed": seed,
+            "rul_cap": config.c02.rul_cap,
+            "alphas": list(config.c02.alphas),
             "git": {"sha": sha, "dirty": False},
             "data": data_provenance,
             "configuration": {
@@ -442,6 +444,7 @@ def write_c05_run(
             "weighting": {
                 "method": config.weighting_method,
                 "features": list(config.weighting_features),
+                "details": result.weighting,
             },
             "quantiles": result.quantiles,
             "artifacts": hashes,

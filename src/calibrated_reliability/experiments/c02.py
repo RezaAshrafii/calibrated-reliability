@@ -221,8 +221,9 @@ class C02Result:
     metrics: dict[str, dict[str, dict[str, Any]]]
     partitions: dict[str, list[int]]
     cut_points: dict[int, int]
-    quantiles: dict[str, float]
+    quantiles: dict[str, Any]
     feature_names: list[str]
+    weighting: dict[str, Any] | None = None
 
 
 def _endpoints(features: pd.DataFrame) -> pd.DataFrame:

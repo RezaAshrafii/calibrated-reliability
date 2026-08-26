@@ -29,6 +29,8 @@ calibration:
 weighting:
   method: logistic_density_ratio
   features: [op_setting_1, op_setting_2, op_setting_3]
+  logistic_c: 1.0
+  max_iter: 1000
 bootstrap:
   n_resamples: 2000
   confidence_level: 0.95
@@ -44,8 +46,12 @@ def test_c05_config_is_strict_and_preregistered() -> None:
 
 
 def test_weighted_quantile_uses_calibration_and_test_weight() -> None:
-    assert _weighted_quantile([1.0, 2.0, 5.0], [1.0, 1.0, 1.0], 1.0, 0.10) == 5.0
+    assert _weighted_quantile([1.0, 2.0, 5.0], [1.0, 1.0, 1.0], 1.0, 0.30) == 5.0
     assert _weighted_quantile([1.0, 2.0, 5.0], [10.0, 1.0, 1.0], 1.0, 0.50) == 1.0
+
+
+def test_weighted_quantile_returns_infinity_for_test_mass_boundary() -> None:
+    assert np.isinf(_weighted_quantile([1.0, 2.0], [1.0, 1.0], 100.0, 0.10))
 
 
 def test_density_ratio_uses_only_operating_settings() -> None:
