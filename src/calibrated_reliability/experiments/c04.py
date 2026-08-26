@@ -7,7 +7,13 @@ from typing import Any
 
 import yaml
 
-from calibrated_reliability.experiments.c02 import C02Config, C02Result, run_c02
+from calibrated_reliability.experiments.c02 import (
+    C02Config,
+    C02FittedPipeline,
+    C02Result,
+    evaluate_c02_pipeline,
+    fit_c02_pipeline,
+)
 
 C04_TARGETS = ("FD001", "FD002", "FD003", "FD004")
 C04_SEEDS = (13, 37, 73, 101, 137)
@@ -66,7 +72,29 @@ def run_c04_target(
     config: C04Config,
     seed: int,
 ) -> C02Result:
-    """Evaluate one target domain without refitting or recalibrating on it."""
+    """Evaluate one target domain using a supplied frozen C02 pipeline."""
+    return evaluate_c02_pipeline(
+        fit_c02_pipeline(source_train, config.c02, seed),
+        target_test,
+        target_rul,
+        config.c02,
+        seed,
+    )
+
+
+def run_c04_target_frozen(
+    pipeline: C02FittedPipeline,
+    target_test: Any,
+    target_rul: Any,
+    config: C04Config,
+    seed: int,
+) -> C02Result:
+    """Evaluate one target domain without refitting or recalibrating."""
     if seed not in config.c02.seeds:
         raise ValueError(f"Seed {seed} is not declared by C04")
-    return run_c02(source_train, target_test, target_rul, config.c02, seed)
+    return evaluate_c02_pipeline(pipeline, target_test, target_rul, config.c02, seed)
+
+
+def fit_c04_seed(source_train: Any, config: C04Config, seed: int) -> C02FittedPipeline:
+    """Fit the FD001 C02 state exactly once for a C04 seed."""
+    return fit_c02_pipeline(source_train, config.c02, seed)

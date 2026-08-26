@@ -240,6 +240,155 @@ def _aligned_truth_at_endpoints(labeled: pd.DataFrame, endpoints: pd.DataFrame) 
     return aligned
 
 
+@dataclass
+class C02FittedPipeline:
+    """Frozen C02 fit/calibration state reusable across target domains."""
+
+    temporal: TemporalFeatureTransformer
+    models: dict[str, Any]
+    partitions: dict[str, list[int]]
+    cut_points: dict[int, int]
+    calibration_scores: pd.DataFrame
+    calibration_truth: np.ndarray
+    quantiles: dict[str, float]
+    feature_names: list[str]
+
+
+def fit_c02_pipeline(train: pd.DataFrame, config: C02Config, seed: int) -> C02FittedPipeline:
+    """Fit and calibrate C02 once using FD001 training engines only."""
+    if seed not in config.seeds:
+        raise ValueError(f"Seed {seed} is not declared by the C02 configuration")
+    partitions = split_engine_ids(train["engine_id"], seed=seed)
+    raw_base = train[train["engine_id"].isin(partitions["base_train"])][COLUMNS].copy()
+    full_labeled = add_rul_targets(train[COLUMNS].copy(), cap=config.rul_cap)
+    base_labeled = add_rul_targets(raw_base, cap=config.rul_cap)
+    cut_points = generate_cut_points(
+        train,
+        partitions["calibration"],
+        seed=seed,
+        min_observed_cycles=config.min_observed_cycles,
+        lower_fraction=config.lower_fraction,
+        upper_fraction=config.upper_fraction,
+    )
+    calibration_raw = restrict_to_cut_points(
+        train[train["engine_id"].isin(partitions["calibration"])][COLUMNS], cut_points
+    )
+    temporal = TemporalFeatureTransformer(
+        windows=config.temporal_windows, variance_threshold=config.variance_threshold
+    ).fit(raw_base)
+    base_features = temporal.transform(raw_base)
+    calibration_features = temporal.transform(calibration_raw)
+    if not base_features[["engine_id", "cycle"]].equals(
+        raw_base[["engine_id", "cycle"]].reset_index(drop=True)
+    ):
+        raise ValueError("Training target order does not match transformed feature order")
+    models = fit_baseline_models(
+        base_features.drop(columns=["engine_id"]),
+        base_labeled["rul_capped"],
+        random_state=seed,
+        ridge_alpha=C02_RIDGE_ALPHA,
+        hgb_max_iter=C02_HGB_MAX_ITER,
+        hgb_learning_rate=C02_HGB_LEARNING_RATE,
+        hgb_max_leaf_nodes=C02_HGB_MAX_LEAF_NODES,
+        hgb_l2_regularization=C02_HGB_L2_REGULARIZATION,
+    )
+    endpoints = _endpoints(calibration_features)
+    scores = _aligned_truth_at_endpoints(full_labeled, endpoints)
+    truth = scores["rul_capped"].to_numpy(dtype="float64")
+    predictions = predict_baselines(models, calibration_features.drop(columns=["engine_id"]))
+    quantiles: dict[str, float] = {}
+    for name, values in predictions.items():
+        endpoint_values = (
+            pd.Series(values, index=calibration_features.index)
+            .loc[calibration_features.groupby("engine_id", sort=True)["cycle"].idxmax()]
+            .to_numpy()
+        )
+        scores[f"{name}_raw"] = endpoint_values
+        scores[name] = np.clip(endpoint_values, 0.0, config.rul_cap)
+        scores[f"{name}_absolute_residual"] = np.abs(
+            truth - scores[name].to_numpy(dtype="float64")
+        )
+        for alpha in config.alphas:
+            _, _, q = split_conformal_intervals(
+                truth,
+                scores[name].to_numpy(dtype="float64"),
+                scores[name].to_numpy(dtype="float64"),
+                alpha,
+            )
+            quantiles[f"{name}_alpha_{alpha:g}"] = q
+    return C02FittedPipeline(
+        temporal=temporal,
+        models=models,
+        partitions=partitions,
+        cut_points=cut_points,
+        calibration_scores=scores,
+        calibration_truth=truth,
+        quantiles=quantiles,
+        feature_names=[n for n in temporal.feature_names_out_ if n != "engine_id"],
+    )
+
+
+def evaluate_c02_pipeline(
+    pipeline: C02FittedPipeline,
+    test: pd.DataFrame,
+    test_rul: pd.DataFrame,
+    config: C02Config,
+    seed: int,
+) -> C02Result:
+    """Evaluate frozen C02 state on one target without fitting or recalibration."""
+    test_ids = [int(value) for value in test["engine_id"].drop_duplicates()]
+    if test_ids != list(range(1, len(test_rul) + 1)):
+        raise ValueError("Test engine IDs must be ordered and contiguous from 1 through RUL rows")
+    features = pipeline.temporal.transform(test[COLUMNS])
+    endpoints = _endpoints(features)
+    if endpoints["engine_id"].tolist() != test_ids:
+        raise ValueError("Endpoint engine order does not match official RUL order")
+    raw_truth = test_rul["rul"].astype("float64").to_numpy()
+    truth = np.clip(raw_truth, 0.0, config.rul_cap)
+    frame = pd.DataFrame({"engine_id": test_ids, "y_true_raw": raw_truth, "y_true": truth})
+    predictions = predict_baselines(pipeline.models, features.drop(columns=["engine_id"]))
+    metrics: dict[str, dict[str, dict[str, Any]]] = {}
+    for name, values in predictions.items():
+        endpoint_values = (
+            pd.Series(values, index=features.index)
+            .loc[features.groupby("engine_id", sort=True)["cycle"].idxmax()]
+            .to_numpy()
+        )
+        frame[f"{name}_raw"] = endpoint_values
+        frame[name] = np.clip(endpoint_values, 0.0, config.rul_cap)
+        metrics[name] = {}
+        for alpha in config.alphas:
+            key = f"alpha_{alpha:g}"
+            center = frame[name].to_numpy()
+            q = pipeline.quantiles[f"{name}_{key}"]
+            lower, upper = center - q, center + q
+            frame[f"{name}_{key}_lower"] = lower
+            frame[f"{name}_{key}_upper"] = upper
+            point: dict[str, Any] = interval_metrics(
+                truth, lower, upper, alpha, float(config.rul_cap)
+            )
+            point["bootstrap_ci"] = bootstrap_interval_metric_cis(
+                truth,
+                lower,
+                upper,
+                alpha,
+                float(config.rul_cap),
+                seed=seed,
+                n_resamples=config.bootstrap_resamples,
+                confidence_level=config.bootstrap_confidence_level,
+            )
+            metrics[name][key] = point
+    return C02Result(
+        predictions=frame,
+        calibration_scores=pipeline.calibration_scores.copy(deep=True),
+        metrics=metrics,
+        partitions=pipeline.partitions,
+        cut_points=pipeline.cut_points,
+        quantiles=dict(pipeline.quantiles),
+        feature_names=list(pipeline.feature_names),
+    )
+
+
 def run_c02(
     train: pd.DataFrame,
     test: pd.DataFrame,

@@ -1,8 +1,14 @@
 """Tests for C04 shift-matrix configuration and isolation contract."""
 
+from types import SimpleNamespace
+
 import pytest
 
-from calibrated_reliability.experiments.c04 import C04Config
+from calibrated_reliability.experiments.c04 import (
+    C04Config,
+    fit_c04_seed,
+    run_c04_target_frozen,
+)
 
 
 def test_c04_config_requires_all_target_domains() -> None:
@@ -31,3 +37,29 @@ bootstrap:
     assert config.as_dict()["experiment_id"] == "C04"
     with pytest.raises(ValueError):
         C04Config.from_yaml(text.replace("FD004", "FD001"))
+
+
+def test_c04_frozen_evaluation_does_not_fit_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = C04Config((), SimpleNamespace(seeds=(13,)))  # type: ignore[arg-type]
+    calls = {"fit": 0, "evaluate": 0}
+    sentinel = object()
+
+    def fake_fit(source: object, c02: object, seed: int) -> object:
+        calls["fit"] += 1
+        return sentinel
+
+    def fake_evaluate(
+        pipeline: object, test: object, rul: object, c02: object, seed: int
+    ) -> object:
+        assert pipeline is sentinel
+        calls["evaluate"] += 1
+        return sentinel
+
+    monkeypatch.setattr("calibrated_reliability.experiments.c04.fit_c02_pipeline", fake_fit)
+    monkeypatch.setattr(
+        "calibrated_reliability.experiments.c04.evaluate_c02_pipeline", fake_evaluate
+    )
+    pipeline = fit_c04_seed(object(), config, 13)
+    run_c04_target_frozen(pipeline, object(), object(), config, 13)
+    run_c04_target_frozen(pipeline, object(), object(), config, 13)
+    assert calls == {"fit": 1, "evaluate": 2}

@@ -12,7 +12,7 @@ import click
 from calibrated_reliability.data.loader import load_rul, load_test, load_train
 from calibrated_reliability.data.registry import load_registry, validate_file
 from calibrated_reliability.experiments.artifacts import write_c04_run
-from calibrated_reliability.experiments.c04 import C04Config, run_c04_target
+from calibrated_reliability.experiments.c04 import C04Config, fit_c04_seed, run_c04_target_frozen
 
 
 @click.command()
@@ -70,11 +70,12 @@ def main(
                 "bytes": records[name].expected_bytes,
             }
     train = load_train(data_root / "train_FD001.txt")
-    for target in targets:
-        test = load_test(data_root / f"test_{target}.txt")
-        rul = load_rul(data_root / f"RUL_{target}.txt")
-        for seed in seeds:
-            result = run_c04_target(train, test, rul, config, seed)
+    for seed in seeds:
+        pipeline = fit_c04_seed(train, config, seed)
+        for target in targets:
+            test = load_test(data_root / f"test_{target}.txt")
+            rul = load_rul(data_root / f"RUL_{target}.txt")
+            result = run_c04_target_frozen(pipeline, test, rul, config, seed)
             run_dir = write_c04_run(
                 output_root,
                 target,
