@@ -1,0 +1,63 @@
+"""Tests for C05 weighted conformal design and leakage boundaries."""
+
+import numpy as np
+import pytest
+
+from calibrated_reliability.experiments.c05 import (
+    C05Config,
+    _density_ratio,
+    _weighted_quantile,
+)
+
+
+def c05_text() -> str:
+    return """
+experiment_id: C05
+source: FD001
+targets: [FD002, FD003, FD004]
+evaluation_unit: engine_endpoint
+seeds: [13, 37, 73, 101, 137]
+alphas: [0.10, 0.05]
+rul_cap: 125
+preprocessing:
+  temporal_windows: [5, 10, 20]
+  variance_threshold: 0.0
+calibration:
+  min_observed_cycles: 30
+  lower_fraction: 0.40
+  upper_fraction: 0.90
+weighting:
+  method: logistic_density_ratio
+  features: [op_setting_1, op_setting_2, op_setting_3]
+bootstrap:
+  n_resamples: 2000
+  confidence_level: 0.95
+  seed_policy: experiment_seed
+"""
+
+
+def test_c05_config_is_strict_and_preregistered() -> None:
+    config = C05Config.from_yaml(c05_text())
+    assert config.targets == ("FD002", "FD003", "FD004")
+    with pytest.raises(ValueError):
+        C05Config.from_yaml(c05_text().replace("logistic_density_ratio", "mean_ratio"))
+
+
+def test_weighted_quantile_uses_calibration_and_test_weight() -> None:
+    assert _weighted_quantile([1.0, 2.0, 5.0], [1.0, 1.0, 1.0], 1.0, 0.10) == 5.0
+    assert _weighted_quantile([1.0, 2.0, 5.0], [10.0, 1.0, 1.0], 1.0, 0.50) == 1.0
+
+
+def test_density_ratio_uses_only_operating_settings() -> None:
+    import pandas as pd
+
+    source = pd.DataFrame(
+        {"op_setting_1": [0.0, 0.0, 1.0, 1.0], "op_setting_2": 0.0, "op_setting_3": 0.0}
+    )
+    target = pd.DataFrame(
+        {"op_setting_1": [1.0, 1.0, 1.0, 1.0], "op_setting_2": 0.0, "op_setting_3": 0.0}
+    )
+    source_weights, target_weights = _density_ratio(source, target)
+    assert np.isfinite(source_weights).all()
+    assert np.isfinite(target_weights).all()
+    assert target_weights.mean() > source_weights[source["op_setting_1"].to_numpy() == 0].mean()

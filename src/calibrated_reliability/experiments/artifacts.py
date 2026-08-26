@@ -16,6 +16,7 @@ from calibrated_reliability.experiments.c01 import C01Config, C01Result
 from calibrated_reliability.experiments.c02 import C02Config, C02Result
 from calibrated_reliability.experiments.c03 import C03Config, C03Result
 from calibrated_reliability.experiments.c04 import C04Config
+from calibrated_reliability.experiments.c05 import C05Config
 
 PACKAGE_NAMES = ("calibrated-reliability", "numpy", "pandas", "scikit-learn", "scipy")
 
@@ -366,6 +367,84 @@ def write_c04_run(
             "bootstrap": config.c02.as_dict()["bootstrap"],
             "quantiles": result.quantiles,
             "artifacts": artifact_hashes,
+        }
+        _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))
+        temporary_dir.rename(run_dir)
+        return run_dir
+    except Exception:
+        shutil.rmtree(temporary_dir, ignore_errors=True)
+        raise
+
+
+def write_c05_run(
+    output_root: Path,
+    target: str,
+    seed: int,
+    sha: str,
+    config: C05Config,
+    result: C02Result,
+    config_path: Path,
+    registry_path: Path,
+    data_provenance: dict[str, dict[str, Any]],
+) -> Path:
+    """Write one immutable C05 weighted-conformal artifact."""
+    run_id = f"C05_{target}_{sha[:12]}_seed_{seed}"
+    run_dir = output_root / run_id
+    output_root.mkdir(parents=True, exist_ok=True)
+    if run_dir.exists():
+        raise FileExistsError(run_dir)
+    temporary_dir = Path(tempfile.mkdtemp(prefix=f".{run_id}.", dir=output_root))
+    try:
+        contents = {
+            "predictions.csv": result.predictions.to_csv(index=False).encode(),
+            "calibration_scores.csv": result.calibration_scores.to_csv(index=False).encode(),
+            "metrics.json": _json_bytes(result.metrics),
+            "quantiles.json": _json_bytes(result.quantiles),
+            "split_manifest.json": _json_bytes(
+                {"seed": seed, "partitions": result.partitions, "cut_points": result.cut_points}
+            ),
+            "resolved_config.json": _json_bytes(config.as_dict()),
+            "run.log": (
+                f"experiment_id=C05\ntarget={target}\nseed={seed}\ngit_sha={sha}\n"
+                "status=completed\n"
+            ).encode(),
+        }
+        hashes = {
+            name: _write_bytes(temporary_dir / name, content) for name, content in contents.items()
+        }
+        manifest = {
+            "run_id": run_id,
+            "experiment_id": "C05",
+            "source": "FD001",
+            "target": target,
+            "evaluation_unit": "engine_endpoint",
+            "seed": seed,
+            "git": {"sha": sha, "dirty": False},
+            "data": data_provenance,
+            "configuration": {
+                "path": config_path.as_posix(),
+                "sha256": compute_sha256(config_path),
+            },
+            "data_registry": {
+                "path": registry_path.as_posix(),
+                "sha256": compute_sha256(registry_path),
+            },
+            "lockfile": {
+                "path": "uv.lock",
+                "sha256": compute_sha256(_repository_root() / "uv.lock"),
+            },
+            "environment": _environment(),
+            "split_manifest": result.partitions,
+            "calibration_cut_points": result.cut_points,
+            "preprocessing": {"feature_names": result.feature_names},
+            "models": config.c02.as_dict()["models"],
+            "bootstrap": config.c02.as_dict()["bootstrap"],
+            "weighting": {
+                "method": config.weighting_method,
+                "features": list(config.weighting_features),
+            },
+            "quantiles": result.quantiles,
+            "artifacts": hashes,
         }
         _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))
         temporary_dir.rename(run_dir)

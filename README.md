@@ -57,6 +57,12 @@ Run the C04 frozen FD001 shift matrix from a clean commit with:
 uv run python scripts/run_c04_shift_matrix.py --config configs/cmapss/shift_matrix.yaml --registry data/registry.yaml
 ```
 
+Run the C05 weighted-conformal shift evaluation from a clean commit with:
+
+```bash
+uv run python scripts/run_c05_weighted_conformal.py --config configs/cmapss/weighted_conformal.yaml --registry data/registry.yaml
+```
+
 
 ## Design principles
 

@@ -252,6 +252,7 @@ class C02FittedPipeline:
     calibration_truth: np.ndarray
     quantiles: dict[str, float]
     feature_names: list[str]
+    calibration_operating_settings: pd.DataFrame
 
 
 def fit_c02_pipeline(train: pd.DataFrame, config: C02Config, seed: int) -> C02FittedPipeline:
@@ -325,6 +326,13 @@ def fit_c02_pipeline(train: pd.DataFrame, config: C02Config, seed: int) -> C02Fi
         calibration_truth=truth,
         quantiles=quantiles,
         feature_names=[n for n in temporal.feature_names_out_ if n != "engine_id"],
+        calibration_operating_settings=endpoints.merge(
+            calibration_features[
+                ["engine_id", "cycle", "op_setting_1", "op_setting_2", "op_setting_3"]
+            ],
+            on=["engine_id", "cycle"],
+            validate="one_to_one",
+        )[["op_setting_1", "op_setting_2", "op_setting_3"]].reset_index(drop=True),
     )
 
 

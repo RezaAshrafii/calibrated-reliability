@@ -6,7 +6,7 @@
 | C02 | RQ2 | Split conformal | FD001 → FD001 | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/conformal.yaml | implemented |
 | C03 | RQ3 | CQR | FD001 → FD001 | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/cqr.yaml | implemented |
 | C04 | RQ4 | Shift matrix | FD001 → FD001/2/3/4 | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/shift_matrix.yaml | implemented |
-| C05 | RQ5 | Weighted conformal | FD001 → shifts | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/shift_matrix.yaml | planned |
+| C05 | RQ5 | Weighted conformal | FD001 → FD002/3/4 | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/weighted_conformal.yaml | implemented |
 | C06 | RQ6 | Sensitivity | cap/calibration | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/conformal.yaml | planned |
 | C07 | RQ4 | Regime-aware scaling | FD001 → FD002/4 | engine endpoint | — | 13,37,73,101,137 | RMSE/MAE | configs/cmapss/shift_matrix.yaml | planned |
 | C08 | RQ5 | ACI | FD001 → shifts | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/shift_matrix.yaml | planned |
