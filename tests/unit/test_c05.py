@@ -48,6 +48,26 @@ def test_c05_config_is_strict_and_preregistered() -> None:
         C05Config.from_yaml(c05_text().replace("logistic_density_ratio", "mean_ratio"))
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("logistic_c", "2.0"), ("max_iter", "500"), ("clip_min", "0.10"), ("clip_max", "0.90")],
+)
+def test_c05_rejects_changes_to_frozen_weighting_design(field: str, value: str) -> None:
+    declared = {
+        "logistic_c": "1.0",
+        "max_iter": "1000",
+        "clip_min": "0.05",
+        "clip_max": "1.0",
+    }
+    with pytest.raises(ValueError):
+        C05Config.from_yaml(
+            c05_text().replace(
+                f"{field}: {declared[field]}",
+                f"{field}: {value}",
+            )
+        )
+
+
 def test_weighted_quantile_uses_calibration_and_test_weight() -> None:
     assert _weighted_quantile([1.0, 2.0, 5.0], [1.0, 1.0, 1.0], 1.0, 0.30) == 5.0
     assert _weighted_quantile([1.0, 2.0, 5.0], [10.0, 1.0, 1.0], 1.0, 0.50) == 1.0

@@ -82,18 +82,19 @@ class C05Config:
         if (
             isinstance(weighting["logistic_c"], bool)
             or not isinstance(weighting["logistic_c"], (int, float))
-            or float(weighting["logistic_c"]) <= 0
+            or float(weighting["logistic_c"]) != 1.0
             or isinstance(weighting["max_iter"], bool)
             or not isinstance(weighting["max_iter"], int)
-            or weighting["max_iter"] < 1
+            or weighting["max_iter"] != 1000
         ):
-            raise ValueError("C05 logistic configuration is invalid")
+            raise ValueError("C05 logistic configuration must be C=1.0 and max_iter=1000")
         if (
             not isinstance(weighting["clip_min"], (int, float))
             or not isinstance(weighting["clip_max"], (int, float))
-            or not 0 < float(weighting["clip_min"]) < float(weighting["clip_max"]) <= 1.0
+            or float(weighting["clip_min"]) != 0.05
+            or float(weighting["clip_max"]) != 1.0
         ):
-            raise ValueError("C05 clipping configuration is invalid")
+            raise ValueError("C05 clipping configuration must be [0.05, 1.0]")
         c02_raw = dict(raw)
         c02_raw.pop("targets")
         c02_raw.pop("weighting")
