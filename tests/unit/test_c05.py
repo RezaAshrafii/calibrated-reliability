@@ -80,6 +80,13 @@ def test_weighted_quantile_uses_calibration_and_test_weight() -> None:
     assert _weighted_quantile([1.0, 2.0, 5.0], [10.0, 1.0, 1.0], 1.0, 0.50) == 1.0
 
 
+def test_weighted_quantile_is_pointwise_in_test_weight() -> None:
+    scores = np.array([1.0, 2.0, 3.0])
+    weights = np.ones(3)
+    assert _weighted_quantile(scores, weights, 0.01, 0.50) == 2.0
+    assert _weighted_quantile(scores, weights, 100.0, 0.50) == float("inf")
+
+
 def test_weighted_quantile_returns_infinity_for_test_mass_boundary() -> None:
     assert np.isinf(_weighted_quantile([1.0, 2.0], [1.0, 1.0], 100.0, 0.10))
 
@@ -106,3 +113,24 @@ def test_density_ratio_uses_only_operating_settings() -> None:
     assert np.isfinite(source_weights).all()
     assert np.isfinite(target_weights).all()
     assert target_weights.mean() > source_weights[source["op_setting_1"].to_numpy() == 0].mean()
+
+
+def test_density_ratio_ignores_labels_and_non_weighting_columns() -> None:
+    import pandas as pd
+
+    source = pd.DataFrame(
+        {
+            "op_setting_1": [0.0, 1.0, 0.0, 1.0],
+            "op_setting_2": [0.0] * 4,
+            "op_setting_3": [0.0] * 4,
+            "rul": [0.0, 0.0, 0.0, 0.0],
+            "sensor_1": [1.0] * 4,
+        }
+    )
+    target = source.copy()
+    target["rul"] = [999.0] * 4
+    target["sensor_1"] = [-999.0] * 4
+    source_weights, target_weights = _density_ratio(source, target)
+    clean_source, clean_target = _density_ratio(source.iloc[:, :3], target.iloc[:, :3])
+    np.testing.assert_allclose(source_weights, clean_source)
+    np.testing.assert_allclose(target_weights, clean_target)
