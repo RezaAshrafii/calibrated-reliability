@@ -37,6 +37,8 @@ C04 reuses the frozen C02 split-conformal pipeline trained and calibrated on FD0
 
 C05 is a transductive weighted-conformal sensitivity experiment from FD001 to FD002, FD003 and FD004. It reuses the frozen FD001 C02 transformer, point models and calibration residuals. Unlabeled target endpoint operating settings may be used only to estimate target/source density ratios; target RUL is never used for fitting or weighting. Each target endpoint uses its own ratio in the weighted conformal quantile. Raw ratios are clipped to `[0.05, 1.0]`, with calibration weights normalized to mean one; this is a bounded-weight sensitivity condition rather than an untruncated covariate-shift guarantee.
 
+C06 is a preregistered FD001-to-FD001 sensitivity analysis. It reports four fixed, non-selected conditions: the primary C02 condition (cap 125, calibration cut-point range 40–90%), cap 130 with the same range, cap 125 with early cut points (40–65%), and cap 125 with late cut points (65–90%). All other C02 choices remain fixed. Conditions are reported separately; no validation or official-test result may select a condition.
+
 ## Primary metrics
 
 RUL: RMSE, MAE, signed error, NASA asymmetric score, interval coverage, interval width, normalized interval score, and engine-level bootstrap confidence intervals. MALT: AUPRC as primary, AUROC, precision, recall, F1, TPR at 5% FPR, Brier score, log loss, marginal and label-conditional conformal coverage, set size, singleton rate, and empty-set rate.
