@@ -89,7 +89,9 @@ class C05Config:
         ):
             raise ValueError("C05 logistic configuration must be C=1.0 and max_iter=1000")
         if (
-            not isinstance(weighting["clip_min"], (int, float))
+            isinstance(weighting["clip_min"], bool)
+            or isinstance(weighting["clip_max"], bool)
+            or not isinstance(weighting["clip_min"], (int, float))
             or not isinstance(weighting["clip_max"], (int, float))
             or float(weighting["clip_min"]) != 0.05
             or float(weighting["clip_max"]) != 1.0

@@ -50,7 +50,14 @@ def test_c05_config_is_strict_and_preregistered() -> None:
 
 @pytest.mark.parametrize(
     ("field", "value"),
-    [("logistic_c", "2.0"), ("max_iter", "500"), ("clip_min", "0.10"), ("clip_max", "0.90")],
+    [
+        ("logistic_c", "2.0"),
+        ("max_iter", "500"),
+        ("clip_min", "0.10"),
+        ("clip_max", "0.90"),
+        ("clip_min", "true"),
+        ("clip_max", "true"),
+    ],
 )
 def test_c05_rejects_changes_to_frozen_weighting_design(field: str, value: str) -> None:
     declared = {
