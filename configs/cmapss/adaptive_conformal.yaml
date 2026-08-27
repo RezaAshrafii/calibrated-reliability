@@ -1,0 +1,23 @@
+experiment_id: C08
+source: FD001
+targets: [FD001, FD002, FD003, FD004]
+evaluation_unit: engine_endpoint_prequential
+seeds: [13, 37, 73, 101, 137]
+alphas: [0.10, 0.05]
+rul_cap: 125
+preprocessing:
+  temporal_windows: [5, 10, 20]
+  variance_threshold: 0.0
+calibration:
+  min_observed_cycles: 30
+  lower_fraction: 0.40
+  upper_fraction: 0.90
+bootstrap:
+  n_resamples: 2000
+  confidence_level: 0.95
+  seed_policy: experiment_seed
+adaptive:
+  method: aci_static_calibration_scores
+  gamma: 0.01
+  alpha_min: 0.001
+  alpha_max: 0.999

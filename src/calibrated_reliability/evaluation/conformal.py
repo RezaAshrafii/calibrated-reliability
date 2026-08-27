@@ -23,6 +23,54 @@ def conformal_quantile(residuals: Any, alpha: float) -> float:
     return float(np.sort(values)[index])
 
 
+def aci_prequential_intervals(
+    residuals: Any,
+    centers: Any,
+    truth: Any,
+    nominal_alpha: float,
+    gamma: float,
+    alpha_min: float,
+    alpha_max: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Build ACI intervals sequentially, updating only after each outcome is revealed."""
+    scores = pd.to_numeric(pd.Series(residuals), errors="raise").to_numpy(dtype="float64")
+    point = pd.to_numeric(pd.Series(centers), errors="raise").to_numpy(dtype="float64")
+    outcome = pd.to_numeric(pd.Series(truth), errors="raise").to_numpy(dtype="float64")
+    if len(scores) == 0 or len(point) == 0 or len(point) != len(outcome):
+        raise ValueError("ACI residuals and endpoint arrays must be non-empty and aligned")
+    if (
+        not np.isfinite(scores).all()
+        or not np.isfinite(point).all()
+        or not np.isfinite(outcome).all()
+    ):
+        raise ValueError("ACI inputs must be finite")
+    if (scores < 0).any() or not 0 < nominal_alpha < 1 or gamma <= 0:
+        raise ValueError("ACI residuals, alpha, or gamma are invalid")
+    if not 0 < alpha_min < alpha_max < 1 or not alpha_min <= nominal_alpha <= alpha_max:
+        raise ValueError("ACI alpha bounds are invalid")
+    used = np.empty(len(point), dtype="float64")
+    next_values = np.empty(len(point), dtype="float64")
+    quantiles = np.empty(len(point), dtype="float64")
+    lower = np.empty(len(point), dtype="float64")
+    upper = np.empty(len(point), dtype="float64")
+    missed = np.empty(len(point), dtype=bool)
+    current = nominal_alpha
+    for index, (center, value) in enumerate(zip(point, outcome, strict=True)):
+        used[index] = current
+        quantiles[index] = conformal_quantile(scores, current)
+        lower[index], upper[index] = center - quantiles[index], center + quantiles[index]
+        missed[index] = bool(value < lower[index] or value > upper[index])
+        current = float(
+            np.clip(
+                current + gamma * (nominal_alpha - float(missed[index])),
+                alpha_min,
+                alpha_max,
+            )
+        )
+        next_values[index] = current
+    return lower, upper, used, next_values, quantiles, missed
+
+
 def split_conformal_intervals(
     y_calibration: Any,
     calibration_prediction: Any,
