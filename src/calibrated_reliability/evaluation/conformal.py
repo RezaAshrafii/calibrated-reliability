@@ -23,52 +23,60 @@ def conformal_quantile(residuals: Any, alpha: float) -> float:
     return float(np.sort(values)[index])
 
 
-def aci_prequential_intervals(
-    residuals: Any,
-    centers: Any,
-    truth: Any,
-    nominal_alpha: float,
-    gamma: float,
-    alpha_min: float,
-    alpha_max: float,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Build ACI intervals sequentially, updating only after each outcome is revealed."""
-    scores = pd.to_numeric(pd.Series(residuals), errors="raise").to_numpy(dtype="float64")
-    point = pd.to_numeric(pd.Series(centers), errors="raise").to_numpy(dtype="float64")
-    outcome = pd.to_numeric(pd.Series(truth), errors="raise").to_numpy(dtype="float64")
-    if len(scores) == 0 or len(point) == 0 or len(point) != len(outcome):
-        raise ValueError("ACI residuals and endpoint arrays must be non-empty and aligned")
-    if (
-        not np.isfinite(scores).all()
-        or not np.isfinite(point).all()
-        or not np.isfinite(outcome).all()
-    ):
-        raise ValueError("ACI inputs must be finite")
-    if (scores < 0).any() or not 0 < nominal_alpha < 1 or gamma <= 0:
-        raise ValueError("ACI residuals, alpha, or gamma are invalid")
-    if not 0 < alpha_min < alpha_max < 1 or not alpha_min <= nominal_alpha <= alpha_max:
-        raise ValueError("ACI alpha bounds are invalid")
-    used = np.empty(len(point), dtype="float64")
-    next_values = np.empty(len(point), dtype="float64")
-    quantiles = np.empty(len(point), dtype="float64")
-    lower = np.empty(len(point), dtype="float64")
-    upper = np.empty(len(point), dtype="float64")
-    missed = np.empty(len(point), dtype=bool)
-    current = nominal_alpha
-    for index, (center, value) in enumerate(zip(point, outcome, strict=True)):
-        used[index] = current
-        quantiles[index] = conformal_quantile(scores, current)
-        lower[index], upper[index] = center - quantiles[index], center + quantiles[index]
-        missed[index] = bool(value < lower[index] or value > upper[index])
-        current = float(
+class ACIState:
+    """Stateful ACI predictor enforcing predict-before-outcome-update order."""
+
+    def __init__(
+        self,
+        residuals: Any,
+        nominal_alpha: float,
+        gamma: float,
+        alpha_min: float,
+        alpha_max: float,
+    ) -> None:
+        values = pd.to_numeric(pd.Series(residuals), errors="raise").to_numpy(dtype="float64")
+        if len(values) == 0 or not np.isfinite(values).all() or (values < 0).any():
+            raise ValueError("ACI residuals must be non-empty, finite, and nonnegative")
+        if not 0 < nominal_alpha < 1 or gamma <= 0:
+            raise ValueError("ACI residuals, alpha, or gamma are invalid")
+        if not 0 < alpha_min < alpha_max < 1 or not alpha_min <= nominal_alpha <= alpha_max:
+            raise ValueError("ACI alpha bounds are invalid")
+        self.residuals = values
+        self.nominal_alpha = nominal_alpha
+        self.gamma = gamma
+        self.alpha_min = alpha_min
+        self.alpha_max = alpha_max
+        self.alpha = nominal_alpha
+        self._pending: tuple[float, float] | None = None
+
+    def predict_interval(self, center: float) -> tuple[float, float, float, float]:
+        """Create one interval without accepting or inspecting its outcome."""
+        if self._pending is not None:
+            raise RuntimeError("ACI outcome must update the state before the next prediction")
+        if not math.isfinite(center):
+            raise ValueError("ACI center must be finite")
+        q = conformal_quantile(self.residuals, self.alpha)
+        lower, upper = center - q, center + q
+        self._pending = (lower, upper)
+        return lower, upper, self.alpha, q
+
+    def update(self, observed_truth: float) -> tuple[bool, float]:
+        """Reveal one outcome and update alpha only for future predictions."""
+        if self._pending is None:
+            raise RuntimeError("ACI interval must be predicted before its outcome is revealed")
+        if not math.isfinite(observed_truth):
+            raise ValueError("ACI observed truth must be finite")
+        lower, upper = self._pending
+        missed = bool(observed_truth < lower or observed_truth > upper)
+        self.alpha = float(
             np.clip(
-                current + gamma * (nominal_alpha - float(missed[index])),
-                alpha_min,
-                alpha_max,
+                self.alpha + self.gamma * (self.nominal_alpha - float(missed)),
+                self.alpha_min,
+                self.alpha_max,
             )
         )
-        next_values[index] = current
-    return lower, upper, used, next_values, quantiles, missed
+        self._pending = None
+        return missed, self.alpha
 
 
 def split_conformal_intervals(

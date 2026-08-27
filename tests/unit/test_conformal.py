@@ -9,7 +9,7 @@ import pytest
 
 from calibrated_reliability.data.loader import COLUMNS
 from calibrated_reliability.evaluation.conformal import (
-    aci_prequential_intervals,
+    ACIState,
     bootstrap_interval_metric_cis,
     conformal_quantile,
     interval_metrics,
@@ -250,25 +250,30 @@ def test_c02_artifact_write_cleans_partial_directory_on_failure(
 
 def test_aci_updates_only_after_the_current_endpoint_outcome() -> None:
     """ACI uses the nominal alpha first, then widens after an observed miss."""
-    lower, upper, used, next_values, quantiles, missed = aci_prequential_intervals(
-        residuals=[1.0, 2.0, 3.0, 4.0],
-        centers=[10.0, 10.0, 10.0],
-        truth=[20.0, 10.0, 10.0],
-        nominal_alpha=0.10,
-        gamma=0.01,
-        alpha_min=0.001,
-        alpha_max=0.999,
-    )
-    assert used[0] == pytest.approx(0.10)
-    assert missed.tolist() == [True, False, False]
-    assert next_values[0] == pytest.approx(0.091)
-    assert used[1] == pytest.approx(next_values[0])
-    assert next_values[1] == pytest.approx(0.092)
-    assert (lower <= upper).all()
-    assert (quantiles >= 0).all()
+    state = ACIState([1.0, 2.0, 3.0, 4.0], 0.10, 0.01, 0.001, 0.999)
+    lower, upper, used, quantile = state.predict_interval(10.0)
+    assert used == pytest.approx(0.10)
+    assert lower <= upper and quantile >= 0
+    missed, next_alpha = state.update(20.0)
+    assert missed is True and next_alpha == pytest.approx(0.091)
+    with pytest.raises(RuntimeError, match="predicted"):
+        state.update(10.0)
+    _, _, used_next, _ = state.predict_interval(10.0)
+    assert used_next == pytest.approx(next_alpha)
 
 
 def test_aci_rejects_invalid_adaptation_parameters() -> None:
     """ACI fails closed rather than silently accepting an invalid online policy."""
     with pytest.raises(ValueError, match="alpha bounds"):
-        aci_prequential_intervals([1.0], [1.0], [1.0], 0.1, 0.01, 0.5, 0.4)
+        ACIState([1.0], 0.1, 0.01, 0.5, 0.4)
+
+
+def test_aci_rejects_update_before_prediction_and_future_outcomes_do_not_change_first_interval() -> (
+    None
+):
+    """The first interval is independent of outcomes revealed later."""
+    first = ACIState([1.0, 2.0, 3.0], 0.10, 0.01, 0.001, 0.999)
+    second = ACIState([1.0, 2.0, 3.0], 0.10, 0.01, 0.001, 0.999)
+    with pytest.raises(RuntimeError, match="predicted"):
+        first.update(100.0)
+    assert first.predict_interval(10.0) == second.predict_interval(10.0)

@@ -11,7 +11,7 @@ import yaml
 
 from calibrated_reliability.data.loader import COLUMNS
 from calibrated_reliability.evaluation.conformal import (
-    aci_prequential_intervals,
+    ACIState,
     bootstrap_interval_metric_cis,
     interval_metrics,
 )
@@ -145,9 +145,18 @@ def evaluate_c08_pipeline(
         metrics[name] = {}
         for alpha in config.c02.alphas:
             key = f"alpha_{alpha:g}"
-            lower, upper, used, next_values, q, missed = aci_prequential_intervals(
-                scores, frame[name], truth, alpha, config.gamma, config.alpha_min, config.alpha_max
-            )
+            state = ACIState(scores, alpha, config.gamma, config.alpha_min, config.alpha_max)
+            lower = np.empty(len(truth))
+            upper = np.empty(len(truth))
+            used = np.empty(len(truth))
+            next_values = np.empty(len(truth))
+            q = np.empty(len(truth))
+            missed = np.empty(len(truth), dtype=bool)
+            for index, center in enumerate(frame[name].to_numpy(dtype="float64")):
+                lower[index], upper[index], used[index], q[index] = state.predict_interval(
+                    float(center)
+                )
+                missed[index], next_values[index] = state.update(float(truth[index]))
             for suffix, values_out in {
                 "lower": lower,
                 "upper": upper,
