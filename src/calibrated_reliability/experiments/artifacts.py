@@ -18,6 +18,7 @@ from calibrated_reliability.experiments.c03 import C03Config, C03Result
 from calibrated_reliability.experiments.c04 import C04Config
 from calibrated_reliability.experiments.c05 import C05Config
 from calibrated_reliability.experiments.c06 import C06Condition, C06Config
+from calibrated_reliability.experiments.c07 import C07Config, C07Result
 
 PACKAGE_NAMES = ("calibrated-reliability", "numpy", "pandas", "scikit-learn", "scipy")
 
@@ -525,6 +526,79 @@ def write_c06_run(
             "models": config.c02_config(condition).as_dict()["models"],
             "bootstrap": config.as_dict()["bootstrap"],
             "quantiles": result.quantiles,
+            "artifacts": hashes,
+        }
+        _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))
+        temporary_dir.rename(run_dir)
+        return run_dir
+    except Exception:
+        shutil.rmtree(temporary_dir, ignore_errors=True)
+        raise
+
+
+def write_c07_run(
+    output_root: Path,
+    target: str,
+    seed: int,
+    sha: str,
+    config: C07Config,
+    result: C07Result,
+    config_path: Path,
+    registry_path: Path,
+    data_provenance: dict[str, dict[str, Any]],
+) -> Path:
+    """Write one immutable C07 regime-aware scaling artifact."""
+    run_id = f"C07_{target}_{sha[:12]}_seed_{seed}"
+    run_dir = output_root / run_id
+    output_root.mkdir(parents=True, exist_ok=True)
+    if run_dir.exists():
+        raise FileExistsError(run_dir)
+    temporary_dir = Path(tempfile.mkdtemp(prefix=f".{run_id}.", dir=output_root))
+    try:
+        contents = {
+            "predictions.csv": result.predictions.to_csv(index=False).encode("utf-8"),
+            "metrics.json": _json_bytes(result.metrics),
+            "split_manifest.json": _json_bytes({"seed": seed, "partitions": result.partitions}),
+            "resolved_config.json": _json_bytes(config.as_dict()),
+            "run.log": (
+                f"experiment_id=C07\ntarget={target}\nseed={seed}\ngit_sha={sha}\n"
+                f"status=completed\nendpoint_rows={len(result.predictions)}\n"
+            ).encode(),
+        }
+        hashes = {
+            name: _write_bytes(temporary_dir / name, content) for name, content in contents.items()
+        }
+        manifest = {
+            "run_id": run_id,
+            "experiment_id": "C07",
+            "source": "FD001",
+            "target": target,
+            "evaluation_unit": "engine_endpoint",
+            "seed": seed,
+            "rul_cap": config.rul_cap,
+            "prediction_clip": [config.clip_min, config.clip_max],
+            "git": {"sha": sha, "dirty": False},
+            "data": data_provenance,
+            "configuration": {
+                "path": config_path.as_posix(),
+                "sha256": compute_sha256(config_path),
+            },
+            "data_registry": {
+                "path": registry_path.as_posix(),
+                "sha256": compute_sha256(registry_path),
+            },
+            "lockfile": {
+                "path": "uv.lock",
+                "sha256": compute_sha256(_repository_root() / "uv.lock"),
+            },
+            "environment": _environment(),
+            "split_manifest": result.partitions,
+            "preprocessing": {
+                "selected_sensors": result.selected_sensors,
+                "feature_names": result.feature_names,
+                "regime_aware_scaling": result.regime_metadata,
+            },
+            "models": config.as_dict()["models"],
             "artifacts": hashes,
         }
         _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))

@@ -10,9 +10,9 @@ Reproducible study of calibrated predictive reliability under structured distrib
 
 ## Status
 
-**Implemented:** C01 point-prediction baselines, leakage-safe temporal features, engine-aware splits, C02 split-conformal intervals, C03 conformalized quantile regression, C04 frozen FD001 shift-matrix evaluation, C05 bounded pointwise weighted conformal sensitivity, C06 preregistered cap/calibration sensitivity analysis, immutable provenance-tracked artifacts, and the CI quality gate.
+**Implemented:** C01 point-prediction baselines, leakage-safe temporal features, engine-aware splits, C02 split-conformal intervals, C03 conformalized quantile regression, C04 frozen FD001 shift-matrix evaluation, C05 bounded pointwise weighted conformal sensitivity, C06 preregistered cap/calibration sensitivity analysis, C07 train-only regime-aware scaling, immutable provenance-tracked artifacts, and the CI quality gate.
 
-**In progress:** regime-aware scaling, adaptive conformal methods, and the MALT study. These are intentionally not presented as implemented results.
+**In progress:** adaptive conformal methods and the MALT study. These are intentionally not presented as implemented results.
 
 ## Research scope
 
@@ -61,6 +61,12 @@ Run the C05 weighted-conformal shift evaluation from a clean commit with:
 
 ```bash
 uv run python scripts/run_c05_weighted_conformal.py --config configs/cmapss/weighted_conformal.yaml --registry data/registry.yaml
+```
+
+Run the C07 regime-aware scaling comparison from a clean commit with:
+
+```bash
+uv run python scripts/run_c07_regime_scaling.py --config configs/cmapss/regime_scaling.yaml --registry data/registry.yaml
 ```
 
 

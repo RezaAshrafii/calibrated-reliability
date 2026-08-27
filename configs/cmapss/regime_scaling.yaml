@@ -1,0 +1,22 @@
+experiment_id: C07
+source: FD001
+targets: [FD001, FD002, FD004]
+evaluation_unit: engine_endpoint
+seeds: [13, 37, 73, 101, 137]
+rul_cap: 125
+prediction_clip: [0.0, 125.0]
+preprocessing:
+  temporal_windows: [5, 10, 20]
+  variance_threshold: 0.0
+  regime_selection: silhouette_auto_2_to_6
+  regime_random_state: 13
+models:
+  mean:
+    strategy: mean
+  ridge:
+    alpha: 1.0
+  hist_gradient_boosting:
+    max_iter: 200
+    learning_rate: 0.05
+    max_leaf_nodes: 15
+    l2_regularization: 0.0

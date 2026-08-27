@@ -39,6 +39,8 @@ C05 is a transductive weighted-conformal sensitivity experiment from FD001 to FD
 
 C06 is a preregistered FD001-to-FD001 sensitivity analysis. It reports four fixed, non-selected conditions: the primary C02 condition (cap 125, calibration cut-point range 40–90%), cap 130 with the same range, cap 125 with early cut points (40–65%), and cap 125 with late cut points (65–90%). All other C02 choices remain fixed. Conditions are reported separately; no validation or official-test result may select a condition.
 
+C07 compares C01 point baselines after train-only regime-aware scaling. It fits the temporal transformer, setting standardizer, silhouette-selected operating-regime clustering (candidate counts 2–6, random state 13), per-regime scalers, and point models only on FD001 base-train engines. The full frozen state is then evaluated without refitting on FD001, FD002, and FD004 official test endpoints. FD001 is the in-distribution reference, FD002 is operating-condition shift, and FD004 is compound/structural shift. A deterministic global-scaling fallback is retained when no valid clustering can be realized. C07 uses the C01 target cap, clipping, baseline-model specifications, and endpoint metrics, but no conformal or adaptive method.
+
 ## Primary metrics
 
 RUL: RMSE, MAE, signed error, NASA asymmetric score, interval coverage, interval width, normalized interval score, and engine-level bootstrap confidence intervals. MALT: AUPRC as primary, AUROC, precision, recall, F1, TPR at 5% FPR, Brier score, log loss, marginal and label-conditional conformal coverage, set size, singleton rate, and empty-set rate.
