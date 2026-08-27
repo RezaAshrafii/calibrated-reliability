@@ -254,6 +254,8 @@ def test_aci_updates_only_after_the_current_endpoint_outcome() -> None:
     lower, upper, used, quantile = state.predict_interval(10.0)
     assert used == pytest.approx(0.10)
     assert lower <= upper and quantile >= 0
+    with pytest.raises(RuntimeError, match="outcome"):
+        state.predict_interval(10.0)
     missed, next_alpha = state.update(20.0)
     assert missed is True and next_alpha == pytest.approx(0.091)
     with pytest.raises(RuntimeError, match="predicted"):
@@ -268,9 +270,7 @@ def test_aci_rejects_invalid_adaptation_parameters() -> None:
         ACIState([1.0], 0.1, 0.01, 0.5, 0.4)
 
 
-def test_aci_rejects_update_before_prediction_and_future_outcomes_do_not_change_first_interval() -> (
-    None
-):
+def test_aci_rejects_update_before_prediction_and_future_outcomes_do_not_change_first_interval():
     """The first interval is independent of outcomes revealed later."""
     first = ACIState([1.0, 2.0, 3.0], 0.10, 0.01, 0.001, 0.999)
     second = ACIState([1.0, 2.0, 3.0], 0.10, 0.01, 0.001, 0.999)

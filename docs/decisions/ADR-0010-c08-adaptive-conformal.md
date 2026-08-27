@@ -13,6 +13,8 @@ calibration engines exactly as in C02. No target-domain data is used for fit,
 tuning, or initial calibration.
 
 Official test-engine endpoints are processed in increasing engine-ID order.
+This is a deterministic benchmark order, not evidence that NASA engine IDs
+represent deployment chronology.
 For endpoint `t`, its interval uses the current adaptive alpha and fixed FD001
 calibration residuals. Only after storing that interval may its RUL be
 revealed. Its miss indicator updates the next alpha by
@@ -28,6 +30,8 @@ Inference Under Distribution Shift" (2021), arXiv:2106.00170.
 ## Consequences
 
 C08 retains the sequential alpha trajectory, interval quantile, and
-post-outcome miss indicator per endpoint. It is an adaptive-monitoring
-comparison, not retrospective target-domain recalibration or a universal
-finite-sample coverage guarantee under arbitrary shifts.
+post-outcome miss indicator per endpoint. The standard engine-level bootstrap
+resamples the realized interval rows and is therefore a conditional fixed-path
+summary; it does not rerun the adaptive trajectory in each resample. It is an
+adaptive-monitoring comparison, not retrospective target-domain recalibration
+or a universal finite-sample coverage guarantee under arbitrary shifts.

@@ -99,6 +99,7 @@ class C08Config:
 
     def as_dict(self) -> dict[str, Any]:
         result = self.c02.as_dict()
+        result.pop("target", None)
         result.update(
             {
                 "experiment_id": "C08",

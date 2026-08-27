@@ -370,6 +370,7 @@ def write_c04_run(
             "preprocessing": {"feature_names": result.feature_names},
             "models": config.c02.as_dict()["models"],
             "bootstrap": config.c02.as_dict()["bootstrap"],
+            "bootstrap_interpretation": "conditional_fixed_path_summary; ACI trajectory not rerun",
             "quantiles": result.quantiles,
             "artifacts": artifact_hashes,
         }
