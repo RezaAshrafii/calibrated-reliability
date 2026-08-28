@@ -1,0 +1,197 @@
+schema_version: 1
+index_id: c01_c08_gate_d
+required_experiments: [C01, C02, C03, C04, C05, C06, C07, C08]
+mixed_sha_policy:
+  mode: allow_across_experiments_only
+  provenance_field: source_git_shas
+  require_single_sha_per_official_tree: true
+entries:
+  - path: outputs/c01
+    experiment_id: C01
+    status: SUPERSEDED
+    expected_manifest_count: 0
+    expected_git_shas: []
+    reason: incomplete_pre_manifest_output
+  - path: outputs/c01_corrected
+    experiment_id: C01
+    status: SUPERSEDED
+    expected_manifest_count: 5
+    expected_git_shas: [c64e3fa782848b2d570ed95b23cf703e7eda0f8b]
+    reason: replaced_by_artifact_hardening
+  - path: outputs/c01_hardened
+    experiment_id: C01
+    status: OFFICIAL
+    expected_manifest_count: 5
+    expected_git_shas: [2be1b54b55316be988cc9a21c5c6acf6294882a5]
+    reason: final_verified_c01_artifacts
+
+  - path: outputs/c02
+    experiment_id: C02
+    status: SUPERSEDED
+    expected_manifest_count: 5
+    expected_git_shas: [33998d5b0bff1861f91ad4386e3ec1fbeca920ab]
+    reason: replaced_by_later_c02_corrections
+  - path: outputs/c02_final
+    experiment_id: C02
+    status: SUPERSEDED
+    expected_manifest_count: 5
+    expected_git_shas: [d5255e08b9810a8eec1f45bbdf31c496b22b7888]
+    reason: replaced_by_provenance_hardening
+  - path: outputs/c02_final_review
+    experiment_id: C02
+    status: SUPERSEDED
+    expected_manifest_count: 5
+    expected_git_shas: [251c6213b2d18bbc94b2606d9e082f5c1c02b1bb]
+    reason: replaced_by_final_review_hardening
+  - path: outputs/c02_final_review_319975d
+    experiment_id: C02
+    status: OFFICIAL
+    expected_manifest_count: 5
+    expected_git_shas: [319975dc35d27f4edba0be75ccef69cb92077127]
+    reason: final_verified_c02_artifacts
+
+  - path: outputs/c03_final_review
+    experiment_id: C03
+    status: SUPERSEDED
+    expected_manifest_count: 5
+    expected_git_shas: [0baadcae22e5e3ea91e0c28e86e4ac4987c56bf1]
+    reason: replaced_by_alignment_and_crossing_hardening
+  - path: outputs/c03_final_review_b542ee0
+    experiment_id: C03
+    status: OFFICIAL
+    expected_manifest_count: 5
+    expected_git_shas: [b542ee03a95a4e43fc142a2ae8cafb02ef6ca7e3]
+    reason: final_verified_c03_artifacts
+
+  - path: outputs/c04_clean_FD001
+    experiment_id: C04
+    status: SUPERSEDED
+    expected_manifest_count: 5
+    expected_git_shas: [01b996189cc35d567af80e3cbbcd151391bfcbde]
+    reason: partial_target_specific_output
+  - path: outputs/c04_clean_FD002
+    experiment_id: C04
+    status: SUPERSEDED
+    expected_manifest_count: 5
+    expected_git_shas: [01b996189cc35d567af80e3cbbcd151391bfcbde]
+    reason: partial_target_specific_output
+  - path: outputs/c04_clean_FD003
+    experiment_id: C04
+    status: SUPERSEDED
+    expected_manifest_count: 5
+    expected_git_shas: [01b996189cc35d567af80e3cbbcd151391bfcbde]
+    reason: partial_target_specific_output
+  - path: outputs/c04_clean_FD004
+    experiment_id: C04
+    status: SUPERSEDED
+    expected_manifest_count: 5
+    expected_git_shas: [01b996189cc35d567af80e3cbbcd151391bfcbde]
+    reason: partial_target_specific_output
+  - path: outputs/c04_final_review
+    experiment_id: C04
+    status: SUPERSEDED
+    expected_manifest_count: 35
+    expected_git_shas:
+      - 01b996189cc35d567af80e3cbbcd151391bfcbde
+      - 841d334023804443b4e1e6a492c0d23c703645af
+    reason: mixed_revision_review_workspace
+  - path: outputs/c04_final_a0f56a9
+    experiment_id: C04
+    status: SUPERSEDED
+    expected_manifest_count: 20
+    expected_git_shas: [a0f56a9d1ff079901205fabc02abfb3e53100da6]
+    reason: replaced_by_frozen_pipeline_hardening
+  - path: outputs/c04_final_e9e7e12
+    experiment_id: C04
+    status: SUPERSEDED
+    expected_manifest_count: 20
+    expected_git_shas: [e9e7e129c5728ba7e23b1f980fa69c9fec974702]
+    reason: repeated_fit_version
+  - path: outputs/c04_final_frozen_b137bf2
+    experiment_id: C04
+    status: SUPERSEDED
+    expected_manifest_count: 20
+    expected_git_shas: [b137bf2df423e0a66c2ae7798c2d10f25d94b52b]
+    reason: replaced_by_final_artifact_hardening
+  - path: outputs/c04_final_hardened_3bf9206
+    experiment_id: C04
+    status: OFFICIAL
+    expected_manifest_count: 20
+    expected_git_shas: [3bf92063fd99e23b7cbdf6a439a2fc4344807710]
+    reason: final_verified_c04_artifacts
+
+  - path: outputs/c05_final_d23266c
+    experiment_id: C05
+    status: SUPERSEDED
+    expected_manifest_count: 15
+    expected_git_shas: [d23266c34dffbb204f5e421bafc758569f07bc9f]
+    reason: pre_pointwise_weighting_version
+  - path: outputs/c05_final_bounded_a2ebbcb
+    experiment_id: C05
+    status: SUPERSEDED
+    expected_manifest_count: 15
+    expected_git_shas: [a2ebbcb50c5f8f159610f855e816612fc8dd08e2]
+    reason: configuration_not_fully_frozen
+  - path: outputs/c05_final_bounded_2cd69cb
+    experiment_id: C05
+    status: SUPERSEDED
+    expected_manifest_count: 15
+    expected_git_shas: [2cd69cbce3f0ae62e0c49a467ae7d1b1fead8ed5]
+    reason: pre_boolean_validation_fix
+  - path: outputs/c05_final_bounded_915f4b6
+    experiment_id: C05
+    status: SUPERSEDED
+    expected_manifest_count: 15
+    expected_git_shas: [915f4b623a33a0ac83ad20df937d0c6ed37b9eb3]
+    reason: replaced_by_test_hardening
+  - path: outputs/c05_final_bounded_4ce7438
+    experiment_id: C05
+    status: SUPERSEDED
+    expected_manifest_count: 15
+    expected_git_shas: [4ce7438f4677222bbc995935d993413f3ea753e4]
+    reason: intermediate_hardening_output
+  - path: outputs/c05_final_bounded_0cfbe63
+    experiment_id: C05
+    status: OFFICIAL
+    expected_manifest_count: 15
+    expected_git_shas: [0cfbe6357863e5bffcf4b3223823d1323fd86b0a]
+    reason: final_verified_c05_artifacts
+
+  - path: outputs/c06_final_1ff8534
+    experiment_id: C06
+    status: SUPERSEDED
+    expected_manifest_count: 20
+    expected_git_shas: [1ff853414681be5fca8c9c5848c6148496fd1a9d]
+    reason: pre_configuration_hardening
+  - path: outputs/c06_final_ba66f41
+    experiment_id: C06
+    status: SUPERSEDED
+    expected_manifest_count: 20
+    expected_git_shas: [ba66f417ef2ac0110bd5886b8c84b5d1495ab8f1]
+    reason: intermediate_hardening_output
+  - path: outputs/c06_final_c86eff4
+    experiment_id: C06
+    status: OFFICIAL
+    expected_manifest_count: 20
+    expected_git_shas: [c86eff4203214cd7b64c5d908bb71cab69f7c555]
+    reason: final_verified_c06_artifacts
+
+  - path: outputs/c07_final_8b6c6bf
+    experiment_id: C07
+    status: OFFICIAL
+    expected_manifest_count: 15
+    expected_git_shas: [8b6c6bf96f05abb9a445fae98a7bba1bce888eb3]
+    reason: final_verified_c07_artifacts
+
+  - path: outputs/c08_final_8519b1e
+    experiment_id: C08
+    status: SUPERSEDED
+    expected_manifest_count: 20
+    expected_git_shas: [8519b1eff4a82af346edaec11fae49c1ca7fc9d2]
+    reason: missing_final_bootstrap_interpretation_metadata
+  - path: outputs/c08_final_8468e13
+    experiment_id: C08
+    status: OFFICIAL
+    expected_manifest_count: 20
+    expected_git_shas: [8468e13b7f2c7c3d937f0b4de6f5198e95e7b0b8]
+    reason: final_verified_historical_c08_artifacts
