@@ -8,6 +8,13 @@ The preregistered C02 configuration is frozen to cap 125, seeds `13,37,73,101,13
 
 Calibration truth is the capped RUL computed from each engine's complete training trajectory before restricting the calibration trajectory to its observed cut point. Calibration and test centers are the C01 evaluation-domain predictions clipped to `[0, 125]`. For each preregistered alpha, the finite-sample conformal quantile uses the order statistic with rank `ceil((n_cal + 1)(1 - alpha))`, capped at the largest available residual. Intervals are symmetric around the clipped center and are not clipped, preserving the stated split-conformal construction.
 
+ADR-0011 distinguishes an interior rank, a valid sample-maximum rank, and a
+finite rank that is unattainable from the available calibration sample. The
+largest-residual cap is the repository's explicit legacy policy for the last
+case; it does not retain the nominal finite-sample conformal guarantee when the
+requested rank exceeds `n_cal`. C02 itself uses 20 calibration engines, for
+which its fixed alpha values request ranks 19 and 20 and are therefore finite.
+
 ## Consequences
 
 C02 reports endpoint coverage, mean interval width, and normalized interval score for every fixed baseline and alpha. The normalized interval score is the mean interval score divided by the cap 125. It also reports deterministic engine-level 95% percentile bootstrap confidence intervals based on 2,000 resamples for each metric, with the experiment seed used as the bootstrap seed. Raw test RUL, raw point predictions, calibration endpoint targets, clipped calibration centers, and absolute calibration residuals remain in artifacts. No model, transformer, hyperparameter, or quantile is fit using official test endpoints.

@@ -1,0 +1,113 @@
+# ADR-0011: Conformal quantile attainability at engine-level calibration budgets
+
+## Status
+
+Accepted as an interpretive correction. This decision does not change an
+experiment implementation and does not require regeneration of C01--C08
+artifacts.
+
+## Context
+
+For `n_cal` calibration scores and nominal miscoverage `alpha`, the requested
+split-conformal order-statistic rank is
+
+`r = ceil((n_cal + 1) * (1 - alpha))`.
+
+A finite order statistic from the observed calibration scores exists only when
+`r <= n_cal`, equivalently when
+
+`n_cal >= ceil(1 / alpha) - 1`.
+
+This repository distinguishes three finite-sample regimes:
+
+- `interior`: `r < n_cal`;
+- `max_statistic`: `r == n_cal`, so the interval half-width is the largest
+  observed calibration score;
+- `finite_quantile_unattainable`: `r > n_cal`, so no finite order statistic at
+  the requested rank exists in the observed calibration sample.
+
+Under an augmented-score conformal convention, an unattainable finite rank is
+represented by an infinite quantile. The repository's unweighted
+`conformal_quantile` helper, used by C02, C03, C04, C06, and C08, instead uses a
+legacy policy that clamps the requested rank to `n_cal` and returns the largest
+observed residual. That policy produces a finite sensitivity interval, but it
+must not be presented as retaining the nominal finite-sample conformal
+guarantee when `r > n_cal`.
+
+The conformal experiments based on the frozen C02 FD001 split use 20
+calibration engines. Their nominal ranks are therefore:
+
+| `n_cal` | `alpha` | requested `r` | regime |
+|---:|---:|---:|---|
+| 20 | 0.10 | 19 | `interior` |
+| 20 | 0.05 | 20 | `max_statistic` |
+
+For C08, adaptive alpha may fall below `1 / 21`, at which point the requested
+finite rank is unattainable and the legacy max-clamp policy saturates the
+interval half-width at the largest fixed FD001 calibration residual.
+
+## Verified C08 consequence
+
+The following descriptive diagnostics were independently reconstructed from
+`outputs/c08_final_8468e13` at clean commit
+`8468e13b7f2c7c3d937f0b4de6f5198e95e7b0b8`. CSV inputs were read with
+`float_precision="round_trip"`. Fractions are averaged over the three models
+and five preregistered seeds.
+
+| target | nominal `alpha=0.05` | nominal `alpha=0.10` |
+|---|---:|---:|
+| FD001 | 0.273 | 0.131 |
+| FD002 | 0.995 | 0.897 |
+| FD003 | 0.731 | 0.231 |
+| FD004 | 0.990 | 0.848 |
+
+These are fractions of prequential endpoints whose current adaptive alpha
+requested `r > 20`; they are not coverage estimates. Across target/seed/model
+cells, coverage was identical between the two nominal alpha settings in 35 of
+60 cells. Mean distinct quantile values per run ranged from 1.00 to 2.05. The
+fixed-residual half-width ceilings across seeds were 34.08--48.29 cycles for
+HistGradientBoosting, 59.90--67.54 for the mean baseline, and 33.97--51.44 for
+Ridge.
+
+## Decision
+
+C08 remains computationally reproducible under its preregistered legacy
+max-clamp implementation, and its existing artifacts remain immutable. They
+must not be regenerated for this documentation correction.
+
+C08 does not establish that ACI generally fails to adapt under distribution
+shift. It establishes the narrower result that, with 20 fixed source-domain
+calibration residuals and the repository's finite max-clamp policy, the
+adaptive quantile frequently saturates and has no further finite width
+resolution. This interpretive limit applies to any report or paper that uses
+the C08 artifacts.
+
+All future conformal designs and result tables must choose `n_cal` and `alpha`
+jointly and retain, at minimum:
+
+- `n_cal`;
+- requested rank `r`;
+- finite-rank attainability;
+- regime (`interior`, `max_statistic`, or
+  `finite_quantile_unattainable`);
+- the explicit unattainable-rank policy;
+- the number of distinct realized quantiles for adaptive evaluations.
+
+A later engineering change must make the quantile policy self-reporting or
+fail closed. It must preserve the existing artifacts as historical outputs and
+must not silently reinterpret their max-clamped values as standard infinite
+quantiles.
+
+## Consequences
+
+Future calibration-size work cannot evaluate a cell whose finite rank is
+unattainable without explicitly selecting and reporting an alternative policy.
+In particular, alpha `0.05` requires at least 19 calibration engines; proposed
+sizes 10 and 15 are excluded for that alpha. A rank equal to `n_cal` remains
+valid but is labelled `max_statistic` because it has the lowest finite
+resolution.
+
+Calibration-conditional Beta laws may be used as idealized exchangeability
+references, but not as the exact law of a fixed finite evaluation set sampled
+against a finite engine reservoir. Project-specific finite-reservoir
+distributions must be computed under the declared sampling design.
