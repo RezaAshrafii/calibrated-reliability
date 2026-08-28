@@ -23,6 +23,8 @@ No research metric is manually transcribed into this Markdown file.
   source run IDs, producing Git SHAs, artifact roots, and manifest hashes.
 - `reports/results/provenance.json`: artifact-index hash, builder revision,
   mixed-SHA policy, official roots, source revisions, and report-file hashes.
+- `reports/results/checksums.sha256`: detached SHA-256 checksums for every CSV
+  report and `provenance.json`.
 
 The classical integer order-statistic rank is not applicable to C05's weighted
 pointwise threshold. Those rank fields are explicitly `PENDING` and labelled
@@ -62,7 +64,10 @@ must not be described as a deployable target-domain repair.
 
 ## Independent reconstruction
 
-Use `docs/RUNBOOK.md` to build into a fresh output directory, then compare every
-generated file hash with `reports/results/provenance.json`. Raw data verification
-and official artifact availability remain local because `data/raw/` and
-`outputs/` are intentionally excluded from Git.
+Use `docs/RUNBOOK.md` to build into a fresh output directory. Exact byte-level
+reconstruction of all files, including provenance, requires the clean builder
+revision recorded in `provenance.json`; a later clean revision is expected to
+reproduce the four numerical CSV files while recording its own builder SHA in
+`provenance.json` and therefore a different detached checksum file. Raw data
+verification and official artifact availability remain local because
+`data/raw/` and `outputs/` are intentionally excluded from Git.

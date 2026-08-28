@@ -4,6 +4,15 @@ The canonical machine-readable index is `docs/artifact_index.yaml`. It lists
 every local top-level tree under `outputs/` and classifies it as `OFFICIAL` or
 `SUPERSEDED`. An unindexed tree is an error, not an implicit candidate result.
 
+The tracked index is also the trust anchor for artifact identity. For every
+indexed tree, `manifest_set_sha256` hashes the sorted sequence
+`relative_manifest_path NUL manifest_sha256 LF`. Editing, adding, removing, or
+relocating a manifest therefore fails before any manifest-provided metadata can
+be reported. `official_run_contracts` independently freezes the complete
+source/target/condition/seed/evaluation-unit Cartesian matrix for C01--C08;
+count-correct substitutions, duplicate cells, missing cells, and duplicate run
+IDs fail closed.
+
 ## Official trees
 
 | Experiment | Official tree | Producing Git SHA | Expected runs |
@@ -30,6 +39,10 @@ manifest hash, prediction hash, metric hash, and producing Git SHA. Aggregate
 outputs retain the complete `source_git_shas` and source-run fields. A duplicate
 official tree, more than one SHA within an official tree, an unindexed output
 tree, or a missing/mismatched artifact fails closed.
+
+Manifest-declared artifact names must be direct regular filenames inside the
+same run directory. Absolute paths, path separators, parent traversal, and
+symbolic-link escapes are rejected.
 
 The index does not make an artifact `VERIFIED` by declaration. The Gate D
 builder independently validates manifests and hashes and reconstructs stored

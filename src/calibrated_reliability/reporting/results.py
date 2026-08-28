@@ -28,7 +28,15 @@ PENDING = "PENDING"
 POINT_MODELS = ("mean", "ridge", "hist_gradient_boosting")
 ALPHAS = (0.1, 0.05)
 REQUIRED_EXPERIMENTS = tuple(f"C{number:02d}" for number in range(1, 9))
-INDEX_KEYS = {"schema_version", "index_id", "required_experiments", "mixed_sha_policy", "entries"}
+INDEX_KEYS = {
+    "schema_version",
+    "index_id",
+    "required_experiments",
+    "mixed_sha_policy",
+    "official_run_contracts",
+    "manifest_set_sha256",
+    "entries",
+}
 ENTRY_KEYS = {
     "path",
     "experiment_id",
@@ -38,6 +46,7 @@ ENTRY_KEYS = {
     "reason",
 }
 POLICY_KEYS = {"mode", "provenance_field", "require_single_sha_per_official_tree"}
+CONTRACT_KEYS = {"source", "targets", "conditions", "seeds", "evaluation_unit"}
 
 
 @dataclass(frozen=True)
@@ -59,6 +68,19 @@ class ArtifactIndex:
     index_id: str
     entries: tuple[ArtifactEntry, ...]
     mixed_sha_policy: dict[str, Any]
+    official_run_contracts: dict[str, RunContract]
+    manifest_set_sha256: dict[str, str]
+
+
+@dataclass(frozen=True)
+class RunContract:
+    """Exact source/target/condition/seed matrix for one official experiment."""
+
+    source: str
+    targets: tuple[str, ...]
+    conditions: tuple[str, ...]
+    seeds: tuple[int, ...]
+    evaluation_unit: str
 
 
 @dataclass(frozen=True)
@@ -100,6 +122,57 @@ def _plain_int(value: Any, label: str) -> int:
     return value
 
 
+def _sha256_text(value: Any, label: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        raise ValueError(f"{label} must be 64 lowercase hexadecimal characters")
+    return value
+
+
+def _unique_strings(value: Any, label: str) -> tuple[str, ...]:
+    if (
+        not isinstance(value, list)
+        or not value
+        or any(not isinstance(item, str) or not item for item in value)
+        or len(set(value)) != len(value)
+    ):
+        raise ValueError(f"{label} must be a non-empty list of unique strings")
+    return tuple(value)
+
+
+def _parse_run_contract(experiment_id: str, value: Any) -> RunContract:
+    if not isinstance(value, dict):
+        raise ValueError(f"Run contract for {experiment_id} must be a mapping")
+    payload = cast(dict[str, Any], value)
+    _strict_keys(payload, CONTRACT_KEYS, f"Run contract for {experiment_id}")
+    source = payload["source"]
+    evaluation_unit = payload["evaluation_unit"]
+    if not isinstance(source, str) or not source:
+        raise ValueError(f"Run contract source for {experiment_id} must be a string")
+    if not isinstance(evaluation_unit, str) or not evaluation_unit:
+        raise ValueError(f"Run contract evaluation unit for {experiment_id} must be a string")
+    seeds_value = payload["seeds"]
+    if not isinstance(seeds_value, list) or not seeds_value:
+        raise ValueError(f"Run contract seeds for {experiment_id} must be a non-empty list")
+    seeds = tuple(
+        _plain_int(seed, f"Run contract seed for {experiment_id}") for seed in seeds_value
+    )
+    if any(seed < 0 for seed in seeds) or len(set(seeds)) != len(seeds):
+        raise ValueError(f"Run contract seeds for {experiment_id} must be unique and nonnegative")
+    return RunContract(
+        source=source,
+        targets=_unique_strings(payload["targets"], f"Run contract targets for {experiment_id}"),
+        conditions=_unique_strings(
+            payload["conditions"], f"Run contract conditions for {experiment_id}"
+        ),
+        seeds=seeds,
+        evaluation_unit=evaluation_unit,
+    )
+
+
 def _safe_output_path(value: Any) -> str:
     if not isinstance(value, str) or not value:
         raise ValueError("Artifact index paths must be non-empty strings")
@@ -121,7 +194,7 @@ def load_artifact_index(index_path: Path) -> ArtifactIndex:
         raise ValueError("Artifact index must be a mapping")
     document = cast(dict[str, Any], payload)
     _strict_keys(document, INDEX_KEYS, "Artifact index")
-    if _plain_int(document["schema_version"], "schema_version") != 1:
+    if _plain_int(document["schema_version"], "schema_version") != 2:
         raise ValueError("Unsupported artifact-index schema version")
     if not isinstance(document["index_id"], str) or not document["index_id"]:
         raise ValueError("index_id must be a non-empty string")
@@ -182,6 +255,20 @@ def load_artifact_index(index_path: Path) -> ArtifactIndex:
                 reason=reason,
             )
         )
+    raw_contracts = document["official_run_contracts"]
+    if not isinstance(raw_contracts, dict) or set(raw_contracts) != set(REQUIRED_EXPERIMENTS):
+        raise ValueError("Official run contracts must cover exactly C01 through C08")
+    contracts = {
+        experiment_id: _parse_run_contract(experiment_id, raw_contracts[experiment_id])
+        for experiment_id in REQUIRED_EXPERIMENTS
+    }
+    raw_manifest_digests = document["manifest_set_sha256"]
+    if not isinstance(raw_manifest_digests, dict) or set(raw_manifest_digests) != seen_paths:
+        raise ValueError("Manifest-set digest keys must match every indexed artifact tree")
+    manifest_digests = {
+        path: _sha256_text(value, f"Manifest-set digest for {path}")
+        for path, value in raw_manifest_digests.items()
+    }
     for experiment_id in REQUIRED_EXPERIMENTS:
         official = [
             entry
@@ -192,10 +279,18 @@ def load_artifact_index(index_path: Path) -> ArtifactIndex:
             raise ValueError(f"{experiment_id} must have exactly one OFFICIAL artifact tree")
         if len(official[0].expected_git_shas) != 1:
             raise ValueError(f"OFFICIAL tree {official[0].path} must declare exactly one Git SHA")
+        contract = contracts[experiment_id]
+        expected_count = len(contract.targets) * len(contract.conditions) * len(contract.seeds)
+        if official[0].expected_manifest_count != expected_count:
+            raise ValueError(
+                f"OFFICIAL manifest count for {experiment_id} does not match its run contract"
+            )
     return ArtifactIndex(
         index_id=str(document["index_id"]),
         entries=tuple(entries),
         mixed_sha_policy=policy,
+        official_run_contracts=contracts,
+        manifest_set_sha256=manifest_digests,
     )
 
 
@@ -212,6 +307,81 @@ def _validate_tree_inventory(repository_root: Path, index: ArtifactIndex) -> Non
         )
 
 
+def _manifest_set_digest(tree: Path, manifests: list[Path]) -> str:
+    payload = "".join(
+        f"{path.relative_to(tree).as_posix()}\0{_sha256(path)}\n" for path in manifests
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _safe_artifact_filename(value: Any, manifest_path: Path) -> str:
+    if (
+        not isinstance(value, str)
+        or not value
+        or value in {".", ".."}
+        or "/" in value
+        or "\\" in value
+        or Path(value).name != value
+    ):
+        raise ValueError(f"Artifact names must be direct filenames in {manifest_path}: {value}")
+    return value
+
+
+def _declared_artifact_path(run_dir: Path, filename: str, manifest_path: Path) -> Path:
+    artifact_path = run_dir / filename
+    if not artifact_path.is_file():
+        raise FileNotFoundError(f"Missing declared artifact: {artifact_path}")
+    if artifact_path.is_symlink() or artifact_path.resolve().parent != run_dir.resolve():
+        raise ValueError(f"Declared artifact must be a direct regular file in {manifest_path}")
+    return artifact_path
+
+
+def _validate_official_run_matrix(runs: list[VerifiedRun], index: ArtifactIndex) -> None:
+    run_ids: set[str] = set()
+    actual: dict[str, set[tuple[str, str, int]]] = {
+        experiment_id: set() for experiment_id in REQUIRED_EXPERIMENTS
+    }
+    for run in runs:
+        manifest = run.manifest
+        experiment_id = run.entry.experiment_id
+        run_id = manifest.get("run_id")
+        target = manifest.get("target")
+        source = manifest.get("source")
+        evaluation_unit = manifest.get("evaluation_unit")
+        seed = manifest.get("seed")
+        if not isinstance(run_id, str) or not run_id:
+            raise ValueError(f"Official run ID must be a non-empty string: {run.run_dir}")
+        if run_id in run_ids:
+            raise ValueError(f"Duplicate official run ID: {run_id}")
+        run_ids.add(run_id)
+        if not isinstance(target, str) or not target:
+            raise ValueError(f"Official target must be a non-empty string: {run.run_dir}")
+        if isinstance(seed, bool) or not isinstance(seed, int):
+            raise ValueError(f"Official seed must be an integer: {run.run_dir}")
+        contract = index.official_run_contracts[experiment_id]
+        if source != contract.source or evaluation_unit != contract.evaluation_unit:
+            raise ValueError(
+                f"Official source or evaluation unit violates {experiment_id} contract"
+            )
+        key = (target, _condition_id(manifest), seed)
+        if key in actual[experiment_id]:
+            raise ValueError(f"Duplicate official run cell for {experiment_id}: {key}")
+        actual[experiment_id].add(key)
+    for experiment_id, contract in index.official_run_contracts.items():
+        expected = {
+            (target, condition, seed)
+            for target in contract.targets
+            for condition in contract.conditions
+            for seed in contract.seeds
+        }
+        if actual[experiment_id] != expected:
+            raise ValueError(
+                f"Official run matrix mismatch for {experiment_id}; "
+                f"missing={sorted(expected - actual[experiment_id])}, "
+                f"unexpected={sorted(actual[experiment_id] - expected)}"
+            )
+
+
 def verify_indexed_artifacts(
     repository_root: Path, index: ArtifactIndex
 ) -> tuple[VerifiedRun, ...]:
@@ -226,6 +396,9 @@ def verify_indexed_artifacts(
                 f"Manifest count mismatch for {entry.path}: "
                 f"expected {entry.expected_manifest_count}, found {len(manifests)}"
             )
+        observed_manifest_digest = _manifest_set_digest(tree, manifests)
+        if observed_manifest_digest != index.manifest_set_sha256[entry.path]:
+            raise ValueError(f"Manifest-set hash mismatch for {entry.path}")
         observed_shas: set[str] = set()
         for manifest_path in manifests:
             manifest = _json(manifest_path)
@@ -243,11 +416,11 @@ def verify_indexed_artifacts(
             if not isinstance(artifacts, dict) or not artifacts:
                 raise ValueError(f"Missing artifact hash map in {manifest_path}")
             for filename, expected_hash in artifacts.items():
-                if not isinstance(filename, str) or not isinstance(expected_hash, str):
-                    raise ValueError(f"Malformed artifact hash map in {manifest_path}")
-                artifact_path = run_dir / filename
-                if not artifact_path.is_file():
-                    raise FileNotFoundError(f"Missing declared artifact: {artifact_path}")
+                filename = _safe_artifact_filename(filename, manifest_path)
+                expected_hash = _sha256_text(
+                    expected_hash, f"Artifact hash for {filename} in {manifest_path}"
+                )
+                artifact_path = _declared_artifact_path(run_dir, filename, manifest_path)
                 if _sha256(artifact_path) != expected_hash:
                     raise ValueError(f"Artifact hash mismatch: {artifact_path}")
             for required in ("predictions.csv", "metrics.json", "resolved_config.json"):
@@ -271,6 +444,7 @@ def verify_indexed_artifacts(
             )
         if entry.status == "OFFICIAL" and len(observed_shas) != 1:
             raise ValueError(f"OFFICIAL tree contains mixed Git SHAs: {entry.path}")
+    _validate_official_run_matrix(official_runs, index)
     return tuple(
         sorted(
             official_runs,
@@ -674,15 +848,7 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writerows(rows)
 
 
-def _builder_sha(repository_root: Path, explicit_sha: str | None) -> str:
-    if explicit_sha is not None:
-        if len(explicit_sha) != 40 or any(
-            character not in "0123456789abcdef" for character in explicit_sha
-        ):
-            raise ValueError(
-                "Explicit builder Git SHA must be 40 lowercase hexadecimal characters"
-            )
-        return explicit_sha
+def _builder_sha(repository_root: Path) -> str:
     status = subprocess.run(
         ["git", "status", "--porcelain"],
         cwd=repository_root,
@@ -712,8 +878,6 @@ def build_results(
     repository_root: Path,
     index_path: Path,
     output_root: Path,
-    *,
-    builder_git_sha: str | None = None,
 ) -> Path:
     """Validate official artifacts and atomically publish deterministic reports."""
     repository_root = repository_root.resolve()
@@ -721,7 +885,7 @@ def build_results(
     output_root = output_root.resolve()
     if output_root.exists():
         raise FileExistsError(output_root)
-    resolved_builder_sha = _builder_sha(repository_root, builder_git_sha)
+    resolved_builder_sha = _builder_sha(repository_root)
     index = load_artifact_index(index_path)
     runs = verify_indexed_artifacts(repository_root, index)
     if {run.entry.experiment_id for run in runs} != set(REQUIRED_EXPERIMENTS):
@@ -742,8 +906,9 @@ def build_results(
         _write_csv(temporary / "summary.csv", summary_rows)
         report_files = sorted(path for path in temporary.iterdir() if path.is_file())
         provenance = {
-            "schema_version": 1,
+            "schema_version": 2,
             "builder_git_sha": resolved_builder_sha,
+            "builder_git_clean": True,
             "artifact_index": {
                 "path": index_path.relative_to(repository_root).as_posix(),
                 "sha256": _sha256(index_path),
@@ -760,8 +925,14 @@ def build_results(
             "report_files": {path.name: _sha256(path) for path in report_files},
             "csv_float_parser": 'pandas.read_csv(float_precision="round_trip")',
             "pending_semantics": "PENDING is not zero and is never excluded as a numeric value",
+            "detached_checksum_file": "checksums.sha256",
         }
         (temporary / "provenance.json").write_bytes(_json_bytes(provenance))
+        checksum_targets = [*report_files, temporary / "provenance.json"]
+        checksum_content = "".join(
+            f"{_sha256(path)}  {path.name}\n" for path in sorted(checksum_targets)
+        ).encode("utf-8")
+        (temporary / "checksums.sha256").write_bytes(checksum_content)
         if output_root.exists():
             raise FileExistsError(output_root)
         temporary.rename(output_root)

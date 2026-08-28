@@ -1,10 +1,90 @@
-schema_version: 1
+schema_version: 2
 index_id: c01_c08_gate_d
 required_experiments: [C01, C02, C03, C04, C05, C06, C07, C08]
 mixed_sha_policy:
   mode: allow_across_experiments_only
   provenance_field: source_git_shas
   require_single_sha_per_official_tree: true
+official_run_contracts:
+  C01:
+    source: FD001
+    targets: [FD001]
+    conditions: [primary]
+    seeds: [13, 37, 73, 101, 137]
+    evaluation_unit: engine_endpoint
+  C02:
+    source: FD001
+    targets: [FD001]
+    conditions: [primary]
+    seeds: [13, 37, 73, 101, 137]
+    evaluation_unit: engine_endpoint
+  C03:
+    source: FD001
+    targets: [FD001]
+    conditions: [primary]
+    seeds: [13, 37, 73, 101, 137]
+    evaluation_unit: engine_endpoint
+  C04:
+    source: FD001
+    targets: [FD001, FD002, FD003, FD004]
+    conditions: [primary]
+    seeds: [13, 37, 73, 101, 137]
+    evaluation_unit: engine_endpoint
+  C05:
+    source: FD001
+    targets: [FD002, FD003, FD004]
+    conditions: [primary]
+    seeds: [13, 37, 73, 101, 137]
+    evaluation_unit: engine_endpoint
+  C06:
+    source: FD001
+    targets: [FD001]
+    conditions: [primary, cap_130, early_calibration, late_calibration]
+    seeds: [13, 37, 73, 101, 137]
+    evaluation_unit: engine_endpoint
+  C07:
+    source: FD001
+    targets: [FD001, FD002, FD004]
+    conditions: [primary]
+    seeds: [13, 37, 73, 101, 137]
+    evaluation_unit: engine_endpoint
+  C08:
+    source: FD001
+    targets: [FD001, FD002, FD003, FD004]
+    conditions: [primary]
+    seeds: [13, 37, 73, 101, 137]
+    evaluation_unit: engine_endpoint_prequential
+manifest_set_sha256:
+  outputs/c01: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  outputs/c01_corrected: b834823e03e6d8257c8eb8a2c7bde6ee52dcf4a829ff3fc1b58caf47c94eefa9
+  outputs/c01_hardened: d9c1b7ce37e0fdc320f1395ba308da1a7093a6990f02aa756e5926dca11142f3
+  outputs/c02: 2e488ae3b9722775f099245d1a6c88936ea450b36b0b8b1c2b8284f7f99ff188
+  outputs/c02_final: c3a4177fad9552ea8b68a950a37bfcd8d99a9819d12fdbc0d1dc39359f197fa8
+  outputs/c02_final_review: 71da4e6e2d8dad4ef52be81dcce8b069af42d303ab453c636bd7a79e3dfb6057
+  outputs/c02_final_review_319975d: 9c0e4c0756ca9dde269237b0f1238eea0ce1aabed4e182ac1e048e0974660095
+  outputs/c03_final_review: 84e9c6cb778694ee946d6fdc81338747ad40bf88b3582eafb24a7ebab4f88f27
+  outputs/c03_final_review_b542ee0: 0fffc2abe2404a249ddb409d17dc75b2855f976407a697c6fc83b0c1dfa56d8f
+  outputs/c04_clean_FD001: 9d7031e4fcade65adff2f23044f83225a2e44345654373081146169f6ef8011e
+  outputs/c04_clean_FD002: ba1afe15a9be648f058e5d17653c88d3bb3d2ac1c8ce2e8cc1147c1f1cad6160
+  outputs/c04_clean_FD003: 0b2bb80f8b62476f7fdaed90fd8a19a68e5c1aae92c0f85bfc73d3a3fbd8216e
+  outputs/c04_clean_FD004: 92be69c1ae72c226d19cedaa12a00cd5a2c1fb967141f3a9e9570a9d4dec0857
+  outputs/c04_final_a0f56a9: 9ea40c1a35465fb9bb5027a74a16798c7a152fca2547a918499002fb3d7fdc5f
+  outputs/c04_final_e9e7e12: 70b79a4affcb86083e234ce1a67b7cd7a0e51d8564869163cd1cad9281470c3a
+  outputs/c04_final_frozen_b137bf2: 94e26035c101f349f8ccc903717a6d4823ef31e54440c64341aa8f9283400226
+  outputs/c04_final_hardened_3bf9206: 5bcc41a30c8d1e46c256d6061e896bc140c8c58e7bc5263d0c8919750f033181
+  outputs/c04_final_review: b595ababd7847de39e2d5b0c1251b7a9c8e47f8f58fd4d557a9fff81e41a3b62
+  outputs/c05_final_bounded_0cfbe63: dacdb8e59612934c73911fe1a1552296580b1b8ba08e46d0406ecb08e1018d27
+  outputs/c05_final_bounded_2cd69cb: 9ab74953e72304e774bbc83899b2e422b535710d56432281e246344da0bbdf2a
+  outputs/c05_final_bounded_4ce7438: 0fcb98ca1646e3cc8a79c0ff496a93a715e3b98477b484bf4e33091acc292055
+  outputs/c05_final_bounded_915f4b6: 4c2298a4c51126eb0aedce4be9ecfd2a8b4b07716118cce1618a0bc38e796cfc
+  outputs/c05_final_bounded_a2ebbcb: ed71853985de395d01a212d726961f01c11f94199e7f3a8b896411e90013134a
+  outputs/c05_final_d23266c: 7a16b324be847a18466a3bce25be8cbd1557ddceae5a782eb895df9f034b4247
+  outputs/c06_final_1ff8534: a38c64c90a2e1f670b3189aafeb0eaf1b72975d792d0094a041afee388110895
+  outputs/c06_final_ba66f41: bb6b610102894557344fb6a29940868b9ded1d400c1e686bab5c8e43b89c1bb6
+  outputs/c06_final_c86eff4: 2eb3e15274281ef0d7a12d3dac62f9e58bf5e44c1a17fcf4bab1b90499810ba6
+  outputs/c07_final_8b6c6bf: 6434ba9973a88627e241eb8d724c3f0583a1d1a8dff3ca5399728317bc934d20
+  outputs/c08_final_8468e13: c7ec52859231f957f464bf9fdd08b03b460e7339fad0500b0ef71b270c6ad8fc
+  outputs/c08_final_8519b1e: 11f958c6b9272dbbb940c3db85c0d2fa6a1fe0be2d12089fe549c2b4ccffbf90
 entries:
   - path: outputs/c01
     experiment_id: C01

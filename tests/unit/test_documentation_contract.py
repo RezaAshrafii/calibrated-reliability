@@ -107,3 +107,17 @@ def test_gate_d_builder_and_artifact_index_are_the_only_reporting_path() -> None
     for experiment_id in range(1, 9):
         assert f"experiment_id: C{experiment_id:02d}" in index
     assert index.count("status: OFFICIAL") == 8
+    assert "official_run_contracts:" in index
+    assert "manifest_set_sha256:" in index
+
+
+def test_gate_d_reconstruction_and_trust_anchor_are_explicit() -> None:
+    runbook = _normalized("docs/RUNBOOK.md")
+    results = _normalized("docs/RESULTS.md")
+    reproducibility = _normalized("REPRODUCIBILITY.md")
+
+    assert "builder_git_sha" in runbook
+    assert "manifest-set digest mismatch" in runbook
+    assert "checksums.sha256" in runbook
+    assert "later clean revision" in results
+    assert "exact official run contracts" in reproducibility
