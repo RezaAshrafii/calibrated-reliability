@@ -12,6 +12,7 @@ import yaml
 from calibrated_reliability.data.loader import COLUMNS
 from calibrated_reliability.evaluation.conformal import (
     ACIState,
+    UnattainableRankPolicy,
     bootstrap_interval_metric_cis,
     interval_metrics,
 )
@@ -26,6 +27,7 @@ from calibrated_reliability.models.baselines import predict_baselines
 
 C08_TARGETS = ("FD001", "FD002", "FD003", "FD004")
 C08_SEEDS = (13, 37, 73, 101, 137)
+C08_UNATTAINABLE_RANK_POLICY: UnattainableRankPolicy = "legacy_max_clamp"
 
 
 @dataclass(frozen=True)
@@ -37,6 +39,7 @@ class C08Config:
     gamma: float
     alpha_min: float
     alpha_max: float
+    unattainable_rank_policy: UnattainableRankPolicy
 
     @classmethod
     def from_yaml(cls, text: str) -> C08Config:
@@ -65,6 +68,7 @@ class C08Config:
         adaptive = raw["adaptive"]
         if not isinstance(adaptive, dict) or set(adaptive) != {
             "method",
+            "unattainable_rank_policy",
             "gamma",
             "alpha_min",
             "alpha_max",
@@ -88,12 +92,18 @@ class C08Config:
             float(adaptive["gamma"]),
             float(adaptive["alpha_min"]),
             float(adaptive["alpha_max"]),
+            C08_UNATTAINABLE_RANK_POLICY,
         )
-        if adaptive["method"] != "aci_static_calibration_scores" or (
-            config.gamma,
-            config.alpha_min,
-            config.alpha_max,
-        ) != (0.01, 0.001, 0.999):
+        if (
+            adaptive["method"] != "aci_static_calibration_scores"
+            or adaptive["unattainable_rank_policy"] != C08_UNATTAINABLE_RANK_POLICY
+            or (
+                config.gamma,
+                config.alpha_min,
+                config.alpha_max,
+            )
+            != (0.01, 0.001, 0.999)
+        ):
             raise ValueError("C08 adaptive policy is not preregistered")
         return config
 
@@ -107,6 +117,7 @@ class C08Config:
                 "evaluation_unit": "engine_endpoint_prequential",
                 "adaptive": {
                     "method": "aci_static_calibration_scores",
+                    "unattainable_rank_policy": self.unattainable_rank_policy,
                     "gamma": self.gamma,
                     "alpha_min": self.alpha_min,
                     "alpha_max": self.alpha_max,
@@ -146,17 +157,35 @@ def evaluate_c08_pipeline(
         metrics[name] = {}
         for alpha in config.c02.alphas:
             key = f"alpha_{alpha:g}"
-            state = ACIState(scores, alpha, config.gamma, config.alpha_min, config.alpha_max)
+            state = ACIState(
+                scores,
+                alpha,
+                config.gamma,
+                config.alpha_min,
+                config.alpha_max,
+                unattainable_rank_policy=config.unattainable_rank_policy,
+            )
             lower = np.empty(len(truth))
             upper = np.empty(len(truth))
             used = np.empty(len(truth))
             next_values = np.empty(len(truth))
             q = np.empty(len(truth))
+            requested_rank = np.empty(len(truth), dtype="int64")
+            effective_rank = np.empty(len(truth), dtype="int64")
+            attainable = np.empty(len(truth), dtype=bool)
+            regime = np.empty(len(truth), dtype=object)
             missed = np.empty(len(truth), dtype=bool)
             for index, center in enumerate(frame[name].to_numpy(dtype="float64")):
                 lower[index], upper[index], used[index], q[index] = state.predict_interval(
                     float(center)
                 )
+                decision = state.last_quantile_result
+                if decision is None or decision.effective_rank is None:
+                    raise RuntimeError("C08 quantile diagnostics are unavailable")
+                requested_rank[index] = decision.requested_rank
+                effective_rank[index] = decision.effective_rank
+                attainable[index] = decision.finite_rank_attainable
+                regime[index] = decision.regime
                 missed[index], next_values[index] = state.update(float(truth[index]))
             for suffix, values_out in {
                 "lower": lower,
@@ -164,6 +193,10 @@ def evaluate_c08_pipeline(
                 "alpha_used": used,
                 "alpha_next": next_values,
                 "quantile": q,
+                "requested_rank": requested_rank,
+                "effective_rank": effective_rank,
+                "finite_rank_attainable": attainable,
+                "quantile_regime": regime,
                 "miss": missed,
             }.items():
                 frame[f"{name}_{key}_{suffix}"] = values_out
@@ -181,7 +214,14 @@ def evaluate_c08_pipeline(
                 config.c02.bootstrap_confidence_level,
             )
             metrics[name][key] = point
-            quantiles[f"{name}_{key}"] = {"initial": float(q[0]), "final": float(q[-1])}
+            quantiles[f"{name}_{key}"] = {
+                "initial": float(q[0]),
+                "final": float(q[-1]),
+                "n_cal": int(len(scores)),
+                "unattainable_rank_policy": config.unattainable_rank_policy,
+                "unattainable_rank_fraction": float((~attainable).mean()),
+                "distinct_quantiles": int(np.unique(q).size),
+            }
     return C02Result(
         frame,
         pipeline.calibration_scores.copy(deep=True),

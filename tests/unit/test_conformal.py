@@ -12,12 +12,19 @@ from calibrated_reliability.evaluation.conformal import (
     ACIState,
     bootstrap_interval_metric_cis,
     conformal_quantile,
+    conformal_quantile_result,
     interval_metrics,
     split_conformal_intervals,
 )
 from calibrated_reliability.experiments import artifacts as artifacts_module
 from calibrated_reliability.experiments.artifacts import write_c02_run
-from calibrated_reliability.experiments.c02 import C02Config, C02Result, run_c02
+from calibrated_reliability.experiments.c02 import (
+    C02Config,
+    C02Result,
+    evaluate_c02_pipeline,
+    fit_c02_pipeline,
+    run_c02,
+)
 
 
 def config_text() -> str:
@@ -64,15 +71,38 @@ def trajectory(engine_count: int, cycles: int) -> pd.DataFrame:
 
 def test_conformal_quantile_uses_finite_sample_rank() -> None:
     """The quantile is the declared order statistic, not an interpolated percentile."""
-    assert conformal_quantile([1.0, 2.0, 5.0], alpha=0.10) == 5.0
-    assert conformal_quantile([1.0, 2.0, 5.0], alpha=0.50) == 2.0
+    interior = conformal_quantile_result([1.0, 2.0, 5.0], alpha=0.50)
+    assert interior.quantile == 2.0
+    assert interior.requested_rank == 2
+    assert interior.regime == "interior"
+    maximum = conformal_quantile_result([1.0, 2.0, 5.0], alpha=0.25)
+    assert maximum.quantile == 5.0
+    assert maximum.requested_rank == 3
+    assert maximum.regime == "max_statistic"
     with pytest.raises(ValueError, match="strictly between"):
         conformal_quantile([1.0], alpha=1.0)
 
 
+def test_unattainable_conformal_rank_requires_an_explicit_policy() -> None:
+    """Unattainable finite ranks fail closed unless a named policy is selected."""
+    with pytest.raises(ValueError, match="unattainable"):
+        conformal_quantile([1.0, 2.0, 5.0], alpha=0.10)
+    infinite = conformal_quantile_result([1.0, 2.0, 5.0], alpha=0.10, on_unattainable="infinite")
+    assert np.isinf(infinite.quantile)
+    assert infinite.effective_rank is None
+    assert infinite.regime == "finite_quantile_unattainable"
+    legacy = conformal_quantile_result(
+        [1.0, 2.0, 5.0], alpha=0.10, on_unattainable="legacy_max_clamp"
+    )
+    assert legacy.quantile == 5.0
+    assert legacy.requested_rank == 4
+    assert legacy.effective_rank == 3
+    assert legacy.finite_rank_attainable is False
+
+
 def test_intervals_and_metrics_are_finite_and_directionally_correct() -> None:
     """Intervals are symmetric and interval score penalizes misses."""
-    lower, upper, q = split_conformal_intervals([10.0, 12.0], [9.0, 13.0], [11.0], 0.10)
+    lower, upper, q = split_conformal_intervals([10.0, 12.0], [9.0, 13.0], [11.0], 0.50)
     assert q == 1.0
     np.testing.assert_allclose(lower, [10.0])
     np.testing.assert_allclose(upper, [12.0])
@@ -97,7 +127,7 @@ def test_interval_score_and_bootstrap_are_exact_and_deterministic() -> None:
         [0.0, 10.0], [1.0, 8.0], [3.0, 9.0], 0.10, 125.0, seed=13
     )
     assert first == second
-    lower, upper, _ = split_conformal_intervals([0.0], [10.0], [0.0], 0.10)
+    lower, upper, _ = split_conformal_intervals([0.0, 0.0], [10.0, 10.0], [0.0], 0.50)
     np.testing.assert_allclose(lower, [-10.0])
     np.testing.assert_allclose(upper, [10.0])
 
@@ -119,7 +149,7 @@ def test_c02_config_rejects_undeclared_design_values() -> None:
 def test_c02_uses_full_training_rul_at_truncated_calibration_endpoint() -> None:
     """Calibration truth is remaining life, not zero at the observed cut point."""
     result = run_c02(
-        trajectory(10, 100),
+        trajectory(100, 40),
         trajectory(2, 50),
         pd.DataFrame({"rul": [145, 10]}),
         C02Config.from_yaml(config_text()),
@@ -140,11 +170,41 @@ def test_c02_uses_full_training_rul_at_truncated_calibration_endpoint() -> None:
     assert (result.calibration_scores["rul_raw"] > 0).all()
     assert np.allclose(
         result.calibration_scores["rul_raw"],
-        100 - result.calibration_scores["cycle"],
+        40 - result.calibration_scores["cycle"],
     )
     assert {"mean_absolute_residual", "ridge_absolute_residual"}.issubset(
         result.calibration_scores
     )
+
+
+def test_c02_fitted_pipeline_is_frozen_and_reused_across_evaluations() -> None:
+    """Direct fit/evaluate APIs preserve splits, full truth, models, and transformer state."""
+    config = C02Config.from_yaml(config_text())
+    pipeline = fit_c02_pipeline(trajectory(100, 40), config, seed=13)
+    partitions = [
+        set(pipeline.partitions[name]) for name in ("base_train", "calibration", "validation")
+    ]
+    assert not (
+        partitions[0] & partitions[1]
+        or partitions[0] & partitions[2]
+        or partitions[1] & partitions[2]
+    )
+    assert set.union(*partitions) == set(range(1, 101))
+    assert np.allclose(
+        pipeline.calibration_scores["rul_raw"],
+        40 - pipeline.calibration_scores["cycle"],
+    )
+    temporal_id = id(pipeline.temporal)
+    model_ids = {name: id(model) for name, model in pipeline.models.items()}
+    scores_before = pipeline.calibration_scores.copy(deep=True)
+    test = trajectory(2, 20)
+    rul = pd.DataFrame({"rul": [10, 20]})
+    first = evaluate_c02_pipeline(pipeline, test, rul, config, seed=13)
+    second = evaluate_c02_pipeline(pipeline, test, rul, config, seed=13)
+    assert id(pipeline.temporal) == temporal_id
+    assert {name: id(model) for name, model in pipeline.models.items()} == model_ids
+    pd.testing.assert_frame_equal(pipeline.calibration_scores, scores_before)
+    pd.testing.assert_frame_equal(first.predictions, second.predictions)
 
 
 def test_c02_rejects_unaligned_official_test_engines() -> None:
@@ -250,7 +310,14 @@ def test_c02_artifact_write_cleans_partial_directory_on_failure(
 
 def test_aci_updates_only_after_the_current_endpoint_outcome() -> None:
     """ACI uses the nominal alpha first, then widens after an observed miss."""
-    state = ACIState([1.0, 2.0, 3.0, 4.0], 0.10, 0.01, 0.001, 0.999)
+    state = ACIState(
+        [1.0, 2.0, 3.0, 4.0],
+        0.10,
+        0.01,
+        0.001,
+        0.999,
+        unattainable_rank_policy="legacy_max_clamp",
+    )
     lower, upper, used, quantile = state.predict_interval(10.0)
     assert used == pytest.approx(0.10)
     assert lower <= upper and quantile >= 0
@@ -267,13 +334,34 @@ def test_aci_updates_only_after_the_current_endpoint_outcome() -> None:
 def test_aci_rejects_invalid_adaptation_parameters() -> None:
     """ACI fails closed rather than silently accepting an invalid online policy."""
     with pytest.raises(ValueError, match="alpha bounds"):
-        ACIState([1.0], 0.1, 0.01, 0.5, 0.4)
+        ACIState(
+            [1.0],
+            0.1,
+            0.01,
+            0.5,
+            0.4,
+            unattainable_rank_policy="legacy_max_clamp",
+        )
 
 
 def test_aci_rejects_update_before_prediction_and_future_outcomes_do_not_change_first_interval():
     """The first interval is independent of outcomes revealed later."""
-    first = ACIState([1.0, 2.0, 3.0], 0.10, 0.01, 0.001, 0.999)
-    second = ACIState([1.0, 2.0, 3.0], 0.10, 0.01, 0.001, 0.999)
+    first = ACIState(
+        [1.0, 2.0, 3.0],
+        0.10,
+        0.01,
+        0.001,
+        0.999,
+        unattainable_rank_policy="legacy_max_clamp",
+    )
+    second = ACIState(
+        [1.0, 2.0, 3.0],
+        0.10,
+        0.01,
+        0.001,
+        0.999,
+        unattainable_rank_policy="legacy_max_clamp",
+    )
     with pytest.raises(RuntimeError, match="predicted"):
         first.update(100.0)
     assert first.predict_interval(10.0) == second.predict_interval(10.0)
@@ -281,8 +369,22 @@ def test_aci_rejects_update_before_prediction_and_future_outcomes_do_not_change_
 
 def test_aci_future_outcomes_do_not_change_prior_intervals_or_alpha_states() -> None:
     """Changing later revealed outcomes cannot retroactively affect the path."""
-    first = ACIState([1.0, 2.0, 3.0], 0.10, 0.01, 0.001, 0.999)
-    second = ACIState([1.0, 2.0, 3.0], 0.10, 0.01, 0.001, 0.999)
+    first = ACIState(
+        [1.0, 2.0, 3.0],
+        0.10,
+        0.01,
+        0.001,
+        0.999,
+        unattainable_rank_policy="legacy_max_clamp",
+    )
+    second = ACIState(
+        [1.0, 2.0, 3.0],
+        0.10,
+        0.01,
+        0.001,
+        0.999,
+        unattainable_rank_policy="legacy_max_clamp",
+    )
     first_path = []
     second_path = []
     for current_first, current_second in zip((10.0, 10.0, 10.0), (10.0, 10.0, 10.0), strict=True):
@@ -292,7 +394,14 @@ def test_aci_future_outcomes_do_not_change_prior_intervals_or_alpha_states() -> 
         second.update(10.0)
     assert first_path == second_path
 
-    altered = ACIState([1.0, 2.0, 3.0], 0.10, 0.01, 0.001, 0.999)
+    altered = ACIState(
+        [1.0, 2.0, 3.0],
+        0.10,
+        0.01,
+        0.001,
+        0.999,
+        unattainable_rank_policy="legacy_max_clamp",
+    )
     altered_path = []
     for index, center in enumerate((10.0, 10.0, 10.0)):
         altered_path.append(altered.predict_interval(center))
@@ -303,12 +412,26 @@ def test_aci_future_outcomes_do_not_change_prior_intervals_or_alpha_states() -> 
 
 def test_aci_alpha_clips_at_both_declared_bounds() -> None:
     """Repeated misses and hits respect the frozen alpha projection bounds."""
-    low = ACIState([1.0], 0.10, 1.0, 0.001, 0.999)
+    low = ACIState(
+        [1.0],
+        0.10,
+        1.0,
+        0.001,
+        0.999,
+        unattainable_rank_policy="legacy_max_clamp",
+    )
     low.predict_interval(0.0)
     _, alpha_after_miss = low.update(100.0)
     assert alpha_after_miss == pytest.approx(0.001)
 
-    high = ACIState([1.0], 0.90, 1.0, 0.001, 0.999)
+    high = ACIState(
+        [1.0],
+        0.90,
+        1.0,
+        0.001,
+        0.999,
+        unattainable_rank_policy="legacy_max_clamp",
+    )
     high.predict_interval(0.0)
     _, alpha_after_hit = high.update(0.0)
     assert alpha_after_hit == pytest.approx(0.999)

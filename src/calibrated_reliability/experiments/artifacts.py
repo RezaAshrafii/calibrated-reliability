@@ -6,6 +6,7 @@ import hashlib
 import importlib.metadata
 import json
 import platform
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -20,8 +21,6 @@ from calibrated_reliability.experiments.c05 import C05Config
 from calibrated_reliability.experiments.c06 import C06Condition, C06Config
 from calibrated_reliability.experiments.c07 import C07Config, C07Result
 from calibrated_reliability.experiments.c08 import C08Config
-
-PACKAGE_NAMES = ("calibrated-reliability", "numpy", "pandas", "scikit-learn", "scipy")
 
 
 def _repository_root() -> Path:
@@ -40,15 +39,35 @@ def _write_bytes(path: Path, content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
+def _direct_runtime_package_names() -> tuple[str, ...]:
+    """Resolve the project's declared non-development dependency distributions."""
+    distribution = importlib.metadata.distribution("calibrated-reliability")
+    names = {"calibrated-reliability"}
+    for requirement in distribution.requires or ():
+        if "extra ==" in requirement:
+            continue
+        name = re.split(r"[\s<>=!~;\[]", requirement, maxsplit=1)[0]
+        if name:
+            names.add(name)
+    return tuple(sorted(names, key=str.casefold))
+
+
 def _environment() -> dict[str, Any]:
-    """Capture interpreter, platform, and runtime package versions."""
-    versions = {name: importlib.metadata.version(name) for name in PACKAGE_NAMES}
+    """Capture interpreter, platform, and every direct runtime package version."""
+    versions = {name: importlib.metadata.version(name) for name in _direct_runtime_package_names()}
     return {
         "python": platform.python_version(),
         "implementation": platform.python_implementation(),
         "platform": platform.platform(),
         "packages": versions,
     }
+
+
+def _publish_directory(temporary_dir: Path, run_dir: Path) -> None:
+    """Publish one completed run only when its immutable destination is still absent."""
+    if run_dir.exists():
+        raise FileExistsError(run_dir)
+    temporary_dir.rename(run_dir)
 
 
 def write_c01_run(
@@ -123,9 +142,7 @@ def write_c01_run(
             "artifacts": artifact_hashes,
         }
         _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))
-        if run_dir.exists():
-            raise FileExistsError(run_dir)
-        temporary_dir.rename(run_dir)
+        _publish_directory(temporary_dir, run_dir)
         return run_dir
     except Exception:
         shutil.rmtree(temporary_dir, ignore_errors=True)
@@ -216,9 +233,7 @@ def write_c02_run(
             "artifacts": artifact_hashes,
         }
         _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))
-        if run_dir.exists():
-            raise FileExistsError(run_dir)
-        temporary_dir.rename(run_dir)
+        _publish_directory(temporary_dir, run_dir)
         return run_dir
     except Exception:
         shutil.rmtree(temporary_dir, ignore_errors=True)
@@ -294,9 +309,7 @@ def write_c03_run(
             "artifacts": artifact_hashes,
         }
         _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))
-        if run_dir.exists():
-            raise FileExistsError(run_dir)
-        temporary_dir.rename(run_dir)
+        _publish_directory(temporary_dir, run_dir)
         return run_dir
     except Exception:
         shutil.rmtree(temporary_dir, ignore_errors=True)
@@ -370,12 +383,11 @@ def write_c04_run(
             "preprocessing": {"feature_names": result.feature_names},
             "models": config.c02.as_dict()["models"],
             "bootstrap": config.c02.as_dict()["bootstrap"],
-            "bootstrap_interpretation": "conditional_fixed_path_summary; ACI trajectory not rerun",
             "quantiles": result.quantiles,
             "artifacts": artifact_hashes,
         }
         _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))
-        temporary_dir.rename(run_dir)
+        _publish_directory(temporary_dir, run_dir)
         return run_dir
     except Exception:
         shutil.rmtree(temporary_dir, ignore_errors=True)
@@ -456,7 +468,7 @@ def write_c05_run(
             "artifacts": hashes,
         }
         _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))
-        temporary_dir.rename(run_dir)
+        _publish_directory(temporary_dir, run_dir)
         return run_dir
     except Exception:
         shutil.rmtree(temporary_dir, ignore_errors=True)
@@ -531,7 +543,7 @@ def write_c06_run(
             "artifacts": hashes,
         }
         _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))
-        temporary_dir.rename(run_dir)
+        _publish_directory(temporary_dir, run_dir)
         return run_dir
     except Exception:
         shutil.rmtree(temporary_dir, ignore_errors=True)
@@ -604,7 +616,7 @@ def write_c07_run(
             "artifacts": hashes,
         }
         _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))
-        temporary_dir.rename(run_dir)
+        _publish_directory(temporary_dir, run_dir)
         return run_dir
     except Exception:
         shutil.rmtree(temporary_dir, ignore_errors=True)
@@ -682,7 +694,7 @@ def write_c08_run(
             "artifacts": hashes,
         }
         _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))
-        temporary_dir.rename(run_dir)
+        _publish_directory(temporary_dir, run_dir)
         return run_dir
     except Exception:
         shutil.rmtree(temporary_dir, ignore_errors=True)

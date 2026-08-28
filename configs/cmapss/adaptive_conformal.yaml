@@ -18,6 +18,7 @@ bootstrap:
   seed_policy: experiment_seed
 adaptive:
   method: aci_static_calibration_scores
+  unattainable_rank_policy: legacy_max_clamp
   gamma: 0.01
   alpha_min: 0.001
   alpha_max: 0.999

@@ -53,8 +53,8 @@ def trajectory(engine_count: int, cycles: int) -> pd.DataFrame:
 
 
 def test_cqr_quantile_uses_nonnegative_conformity_score() -> None:
-    assert cqr_conformity_quantile([10, 20, 30], [9, 19, 31], [11, 21, 32], 0.1) == 1.0
-    lower, upper, q = cqr_intervals([10, 20, 30], [9, 19, 31], [11, 21, 32], [8], [12], 0.1)
+    assert cqr_conformity_quantile([10, 20, 30], [9, 19, 31], [11, 21, 32], 0.25) == 1.0
+    lower, upper, q = cqr_intervals([10, 20, 30], [9, 19, 31], [11, 21, 32], [8], [12], 0.25)
     assert q == 1.0
     np.testing.assert_allclose(lower, [7.0])
     np.testing.assert_allclose(upper, [13.0])
@@ -66,7 +66,7 @@ def test_c03_is_frozen_and_uses_full_calibration_truth() -> None:
     config = C03Config.from_yaml(config_text())
     assert config.as_dict()["bootstrap"]["seed_policy"] == "experiment_seed"
     result = run_c03(
-        trajectory(10, 100), trajectory(2, 50), pd.DataFrame({"rul": [145, 10]}), config, 13
+        trajectory(100, 40), trajectory(2, 50), pd.DataFrame({"rul": [145, 10]}), config, 13
     )
     assert len(result.predictions) == 2
     assert result.predictions.engine_id.tolist() == [1, 2]

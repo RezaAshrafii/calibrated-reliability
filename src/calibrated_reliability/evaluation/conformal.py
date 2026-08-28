@@ -3,14 +3,35 @@
 from __future__ import annotations
 
 import math
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
 
+UnattainableRankPolicy = Literal["raise", "infinite", "legacy_max_clamp"]
 
-def conformal_quantile(residuals: Any, alpha: float) -> float:
-    """Return the finite-sample split-conformal residual quantile."""
+
+@dataclass(frozen=True)
+class ConformalQuantileResult:
+    """Self-reporting finite-sample conformal quantile decision."""
+
+    quantile: float
+    n_cal: int
+    requested_rank: int
+    effective_rank: int | None
+    finite_rank_attainable: bool
+    regime: Literal["interior", "max_statistic", "finite_quantile_unattainable"]
+    unattainable_rank_policy: UnattainableRankPolicy
+
+
+def conformal_quantile_result(
+    residuals: Any,
+    alpha: float,
+    *,
+    on_unattainable: UnattainableRankPolicy = "raise",
+) -> ConformalQuantileResult:
+    """Return a quantile together with rank attainability diagnostics."""
     values = pd.to_numeric(pd.Series(residuals), errors="raise").to_numpy(dtype="float64")
     if values.ndim != 1 or len(values) == 0 or not np.isfinite(values).all():
         raise ValueError("Residuals must be a non-empty finite one-dimensional array")
@@ -18,9 +39,50 @@ def conformal_quantile(residuals: Any, alpha: float) -> float:
         raise ValueError("alpha must be strictly between 0 and 1")
     if (values < 0).any():
         raise ValueError("Absolute residuals cannot be negative")
-    rank = int(math.ceil((len(values) + 1) * (1.0 - alpha)))
-    index = min(max(rank - 1, 0), len(values) - 1)
-    return float(np.sort(values)[index])
+    if on_unattainable not in {"raise", "infinite", "legacy_max_clamp"}:
+        raise ValueError("Unknown unattainable-rank policy")
+    n_cal = len(values)
+    rank = int(math.ceil((n_cal + 1) * (1.0 - alpha)))
+    if rank < n_cal:
+        regime: Literal["interior", "max_statistic", "finite_quantile_unattainable"] = "interior"
+    elif rank == n_cal:
+        regime = "max_statistic"
+    else:
+        regime = "finite_quantile_unattainable"
+    attainable = rank <= n_cal
+    if not attainable and on_unattainable == "raise":
+        raise ValueError(
+            f"Requested conformal rank {rank} is unattainable with {n_cal} calibration scores"
+        )
+    sorted_values = np.sort(values)
+    if attainable:
+        effective_rank: int | None = rank
+        quantile = float(sorted_values[rank - 1])
+    elif on_unattainable == "infinite":
+        effective_rank = None
+        quantile = math.inf
+    else:
+        effective_rank = n_cal
+        quantile = float(sorted_values[-1])
+    return ConformalQuantileResult(
+        quantile=quantile,
+        n_cal=n_cal,
+        requested_rank=rank,
+        effective_rank=effective_rank,
+        finite_rank_attainable=attainable,
+        regime=regime,
+        unattainable_rank_policy=on_unattainable,
+    )
+
+
+def conformal_quantile(
+    residuals: Any,
+    alpha: float,
+    *,
+    on_unattainable: UnattainableRankPolicy = "raise",
+) -> float:
+    """Return a finite-sample quantile under an explicit unattainable-rank policy."""
+    return conformal_quantile_result(residuals, alpha, on_unattainable=on_unattainable).quantile
 
 
 class ACIState:
@@ -33,6 +95,8 @@ class ACIState:
         gamma: float,
         alpha_min: float,
         alpha_max: float,
+        *,
+        unattainable_rank_policy: UnattainableRankPolicy,
     ) -> None:
         values = pd.to_numeric(pd.Series(residuals), errors="raise").to_numpy(dtype="float64")
         if len(values) == 0 or not np.isfinite(values).all() or (values < 0).any():
@@ -41,13 +105,17 @@ class ACIState:
             raise ValueError("ACI residuals, alpha, or gamma are invalid")
         if not 0 < alpha_min < alpha_max < 1 or not alpha_min <= nominal_alpha <= alpha_max:
             raise ValueError("ACI alpha bounds are invalid")
+        if unattainable_rank_policy not in {"raise", "infinite", "legacy_max_clamp"}:
+            raise ValueError("Unknown unattainable-rank policy")
         self.residuals = values
         self.nominal_alpha = nominal_alpha
         self.gamma = gamma
         self.alpha_min = alpha_min
         self.alpha_max = alpha_max
+        self.unattainable_rank_policy = unattainable_rank_policy
         self.alpha = nominal_alpha
         self._pending: tuple[float, float] | None = None
+        self.last_quantile_result: ConformalQuantileResult | None = None
 
     def predict_interval(self, center: float) -> tuple[float, float, float, float]:
         """Create one interval without accepting or inspecting its outcome."""
@@ -55,7 +123,13 @@ class ACIState:
             raise RuntimeError("ACI outcome must update the state before the next prediction")
         if not math.isfinite(center):
             raise ValueError("ACI center must be finite")
-        q = conformal_quantile(self.residuals, self.alpha)
+        decision = conformal_quantile_result(
+            self.residuals,
+            self.alpha,
+            on_unattainable=self.unattainable_rank_policy,
+        )
+        self.last_quantile_result = decision
+        q = decision.quantile
         lower, upper = center - q, center + q
         self._pending = (lower, upper)
         return lower, upper, self.alpha, q
@@ -133,7 +207,6 @@ def cqr_intervals(
     alpha: float,
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """Build unbounded CQR intervals without refitting quantile models."""
-    q = cqr_conformity_quantile(y_calibration, lower_calibration, upper_calibration, alpha)
     lower = pd.to_numeric(pd.Series(lower_prediction), errors="raise").to_numpy(dtype="float64")
     upper = pd.to_numeric(pd.Series(upper_prediction), errors="raise").to_numpy(dtype="float64")
     if len(lower) == 0 or len(lower) != len(upper):
@@ -142,6 +215,7 @@ def cqr_intervals(
         raise ValueError("CQR prediction arrays must be finite")
     if (lower > upper).any():
         raise ValueError("CQR lower predictions cannot exceed upper predictions")
+    q = cqr_conformity_quantile(y_calibration, lower_calibration, upper_calibration, alpha)
     return lower - q, upper + q, q
 
 

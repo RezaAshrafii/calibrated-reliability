@@ -4,13 +4,15 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import pandas as pd
 import pytest
 
+from calibrated_reliability.data.loader import COLUMNS
 from calibrated_reliability.experiments import artifacts as artifacts_module
 from calibrated_reliability.experiments.artifacts import write_c08_run
 from calibrated_reliability.experiments.c02 import C02Result
-from calibrated_reliability.experiments.c08 import C08Config, run_c08_seed
+from calibrated_reliability.experiments.c08 import C08Config, evaluate_c08_pipeline, run_c08_seed
 
 
 def _config_text() -> str:
@@ -22,6 +24,7 @@ def test_c08_config_is_fail_closed() -> None:
     config = C08Config.from_yaml(_config_text())
     assert config.targets == ("FD001", "FD002", "FD003", "FD004")
     assert config.gamma == 0.01
+    assert config.unattainable_rank_policy == "legacy_max_clamp"
     with pytest.raises(ValueError, match="preregistered"):
         C08Config.from_yaml(_config_text().replace("gamma: 0.01", "gamma: 0.02"))
     with pytest.raises(ValueError, match="numeric"):
@@ -30,6 +33,8 @@ def test_c08_config_is_fail_closed() -> None:
         C08Config.from_yaml(
             _config_text().replace("  alpha_max: 0.999", "  alpha_max: 0.999\n  extra: 1")
         )
+    with pytest.raises(ValueError, match="preregistered"):
+        C08Config.from_yaml(_config_text().replace("legacy_max_clamp", "infinite"))
 
 
 def test_c08_fits_fd001_once_then_reuses_the_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -61,6 +66,65 @@ def test_c08_fits_fd001_once_then_reuses_the_pipeline(monkeypatch: pytest.Monkey
         target: f"test {target}" for target in config.targets
     }  # type: ignore[arg-type]
     assert calls == {"fit": 1, "evaluate": 4}
+
+
+def _endpoint_trajectories(engine_count: int = 3) -> pd.DataFrame:
+    rows: list[dict[str, float | int]] = []
+    for engine_id in range(1, engine_count + 1):
+        for cycle in (1, 2):
+            row: dict[str, float | int] = {
+                "engine_id": engine_id,
+                "cycle": cycle,
+                "op_setting_1": 0.0,
+                "op_setting_2": 0.0,
+                "op_setting_3": 0.0,
+            }
+            row.update({f"sensor_{index}": 0.0 for index in range(1, 22)})
+            rows.append(row)
+    return pd.DataFrame(rows, columns=COLUMNS)
+
+
+def test_c08_full_evaluator_isolates_future_truth_and_reports_rank_diagnostics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Changing the final truth cannot alter its own or any earlier interval decision."""
+
+    class IdentityTemporal:
+        def transform(self, frame: pd.DataFrame) -> pd.DataFrame:
+            return frame.reset_index(drop=True)
+
+    monkeypatch.setattr(
+        "calibrated_reliability.experiments.c08.predict_baselines",
+        lambda models, features: {"mean": np.full(len(features), 10.0)},
+    )
+    calibration_scores = pd.DataFrame({"mean_absolute_residual": np.arange(1.0, 21.0)})
+    pipeline = SimpleNamespace(
+        temporal=IdentityTemporal(),
+        models={"mean": object()},
+        calibration_scores=calibration_scores,
+        partitions={"base_train": [1], "calibration": [2], "validation": [3]},
+        cut_points={2: 30},
+        feature_names=["cycle"],
+    )
+    config = C08Config.from_yaml(_config_text())
+    test = _endpoint_trajectories()
+    first = evaluate_c08_pipeline(pipeline, test, pd.DataFrame({"rul": [10, 10, 10]}), config, 13)
+    second = evaluate_c08_pipeline(
+        pipeline, test, pd.DataFrame({"rul": [10, 10, 125]}), config, 13
+    )
+    pd.testing.assert_frame_equal(first.predictions.iloc[:2], second.predictions.iloc[:2])
+    decision_columns = [
+        name
+        for name in first.predictions
+        if name.endswith(("_lower", "_upper", "_alpha_used", "_quantile", "_requested_rank"))
+    ]
+    pd.testing.assert_series_equal(
+        first.predictions.loc[2, decision_columns],
+        second.predictions.loc[2, decision_columns],
+    )
+    assert any(name.endswith("_finite_rank_attainable") for name in first.predictions)
+    assert any(name.endswith("_quantile_regime") for name in first.predictions)
+    pd.testing.assert_frame_equal(pipeline.calibration_scores, calibration_scores)
 
 
 def test_c08_artifact_records_fixed_path_bootstrap_and_is_immutable(tmp_path: Path) -> None:
