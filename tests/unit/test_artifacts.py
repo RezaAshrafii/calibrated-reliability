@@ -14,14 +14,12 @@ def test_environment_records_every_declared_direct_runtime_dependency() -> None:
     expected = {
         "calibrated-reliability",
         "click",
-        "mapie",
         "matplotlib",
         "numpy",
         "pandas",
         "pyyaml",
         "scikit-learn",
         "scipy",
-        "xgboost",
     }
     assert set(packages) == expected
     assert all(isinstance(version, str) and version for version in packages.values())
