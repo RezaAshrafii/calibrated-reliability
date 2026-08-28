@@ -2,30 +2,63 @@
 
 ## Status and scope
 
-This preregistration-style protocol defines evaluation before results are generated. The project studies calibrated predictive reliability under structured distribution shift. It does not claim a new method, solve AI safety, or provide universal guarantees.
+This protocol records the frozen contracts used by completed C01--C08 and the
+review gates that constrain future work. It contains no numerical research
+results. The project studies calibrated predictive reliability under structured
+distribution shift; it does not claim a new conformal method, state-of-the-art
+performance, causal safety effects, or universal guarantees.
+
+C01--C04 are replication and benchmark context. C05--C08 are exploratory or
+appendix evidence. Gate N returned `REFRAME`: the candidate primary contribution
+is a narrow application-level audit of engine-level conformal rank attainability
+and resolution against the exact Beta reference and the C-MAPSS observation
+mechanism. `docs/NOVELTY_MATRIX.md` and `docs/RELATED_WORK.md` govern the claim
+boundary.
 
 ## Questions and hypotheses
 
-- **RQ1:** How do point-prediction baselines behave on C-MAPSS RUL?
-- **RQ2:** How does split conformal calibration affect interval coverage and width?
-- **RQ3:** How does CQR compare with split conformal at similar coverage?
-- **RQ4:** How does performance change under operating-condition, fault-mode, and compound shifts?
-- **RQ5:** Can weighting or adaptive calibration mitigate selected shifts?
-- **RQ6:** How sensitive are conclusions to RUL cap, seed, and calibration size?
-- **RQ7:** Does task-family grouping change MALT monitoring estimates?
-- **RQ8:** Do marginal metrics conceal poor positive-class behavior?
+- **RQ1 -- benchmark context:** What reproducible point and interval reliability
+  behavior is observed under the declared C-MAPSS in-distribution and structured
+  shift evaluations?
+- **RQ2 -- candidate primary mechanism:** When whole engines are calibration
+  units, how do finite-rank attainability and resolution constrain the frozen
+  C-MAPSS conformal pipeline, and how does its calibration-draw distribution
+  compare with the exact exchangeable Beta reference under the benchmark's
+  observation mechanism?
+- **RQ3 -- optional supporting diagnostic:** After controlling observation
+  policy and RUL-cap saturation, how does strictly disjoint labelled
+  target-domain recalibration compare with frozen source calibration when the
+  predictor is held fixed?
 
-These are hypotheses, not results: CQR may produce narrower intervals at comparable coverage; naive conformal may lose coverage under shift; weighting may help selectively; marginal MALT coverage may hide poor positive-class coverage; random transcript splits may be optimistic compared with task-family splits.
+RQ1 is addressed only as replication/context by C01--C04. C05--C08 are
+exploratory evidence that motivates RQ2 but does not answer it. RQ2 requires a
+future C11 design ADR and review. RQ3 is a non-deployable oracle contrast and is
+considered only after C11; it is not a novel repair method.
 
 ## Evaluation units and splits
 
-C-MAPSS uses engine-level partitions and the last observed test-engine endpoint as the primary evaluation unit. MALT uses task-family-aware partitions and transcript-level evaluation. Transformers, feature selectors, scalers, thresholds, and tuning decisions must be fit only on relevant training data. Official test data is never used for tuning.
+C-MAPSS uses engine-level partitions and the last observed test-engine endpoint
+as the primary evaluation unit. Transformers, feature selectors, scalers,
+thresholds, and tuning decisions must be fit only on relevant training data.
+Official test data is never used for tuning. MALT is deferred outside the core
+study; ADR-0002 preserves the grouping rule that would apply if a separately
+reviewed future study revives it.
 
 Phase 5 feature construction is fail-closed. Predictor input contains only `engine_id`, `cycle`, the three operating settings, and NASA C-MAPSS sensors `sensor_1` through `sensor_21`; targets are passed separately and are never accepted as feature columns. Temporal output may additionally contain `cycle_index`, one-cycle sensor deltas, and past-only rolling mean, population standard deviation, and least-squares slope features for configured positive windows. The fit-time column schema is enforced during transform. `engine_id` is retained only for trajectory alignment and is removed before model input. `cycle_ratio` and any feature derived from terminal trajectory length are prohibited.
 
 Operating-regime clustering and all scalers are fit on base-training rows only. A requested clustering is valid only when it realizes exactly the requested number of non-empty regimes. Single-setting or invalid-clustering cases use a deterministic global scaler and record the fallback reason in the fitted transformer.
 
 For C-MAPSS, each source training set is split by engine into 60% base-train, 20% calibration, and 20% validation using each fixed seed. Calibration uses one deterministic cut point per calibration engine, with at least 30 observed cycles and a cut point between 40% and 90% of that engine's observed trajectory. The primary RUL cap is 125; cap 130 is the preregistered sensitivity. Fixed seeds are `13, 37, 73, 101, 137`, and primary conformal levels are alpha `0.10` and `0.05`. C-MAPSS shift labels are FD001→FD001 in-distribution, FD001→FD002 operating-condition shift, FD001→FD003 fault-mode shift, and FD001→FD004 compound/structural shift. FD003/FD004 must not be described as pure covariate shift.
+
+The calibration and official-test observation mechanisms are not assumed to be
+exchangeable. Calibration endpoints are policy-selected prefixes of complete
+run-to-failure training trajectories, whereas official test endpoints are
+provided by NASA with unobserved future trajectories and a separate RUL file.
+Differences among domain, observed-cycle horizon, degradation stage, and
+cap-saturation frequency can therefore be entangled. C04--C08 are benchmark
+evaluations under these declared mechanisms, not ordinary-exchangeability
+coverage guarantees. Any future C11/C12 interpretation must treat this mismatch
+as a measured diagnostic or limitation rather than an established cause.
 
 C01 is a cycle-weighted point-baseline experiment: every observed base-training cycle contributes one training row, while evaluation uses exactly one final observed endpoint per official FD001 test engine. It uses past-only temporal features without regime clustering or regime-aware scaling; those methods are reserved for C07. Both training targets and endpoint targets are capped at 125. Raw targets and raw predictions are retained for audit, but primary C01 metrics use targets and predictions clipped to the preregistered support `[0, 125]`. Signed error is defined as `prediction - target`, so positive values indicate overprediction. These choices are fixed in ADR-0003 and the executable C01 configuration.
 
@@ -45,8 +78,34 @@ C08 is an adaptive conformal prequential evaluation. It fits and calibrates the 
 
 ## Primary metrics
 
-RUL: RMSE, MAE, signed error, NASA asymmetric score, interval coverage, interval width, normalized interval score, and engine-level bootstrap confidence intervals. MALT: AUPRC as primary, AUROC, precision, recall, F1, TPR at 5% FPR, Brier score, log loss, marginal and label-conditional conformal coverage, set size, singleton rate, and empty-set rate.
+RUL: RMSE, MAE, signed error, NASA asymmetric score, interval coverage,
+interval width, normalized interval score, and engine-level bootstrap confidence
+intervals. Completed metric artifacts are not automatically reportable; Gate D
+must reconstruct approved tables from indexed verified artifacts.
+
+## Future design gates
+
+C11 is not implemented and must not run before a dedicated ADR freezes its
+engine reservoir, predictor, calibration sizes, attainable alpha/size cells,
+cut points, exact-enumeration estimand, Beta references, finite-reservoir
+interpretation, artifacts, and tests. Independent C11-A review is required
+before execution.
+
+C12 is optional and must not precede the reviewed C11 mechanism result. If
+retained, only Conditions A/B may be designed. Target calibration and evaluation
+must be disjoint; target labels must not alter the frozen predictor; observation
+policy and RUL-cap saturation require explicit controls; and every output must
+state `ORACLE / DIAGNOSTIC - NOT A DEPLOYMENT METHOD`. C12-D is out of scope.
+
+MALT, N-CMAPSS expansion, additional deep models, and product/dashboard work
+remain deferred outside the current core study.
 
 ## Integrity rules
 
-Runs must retain configuration, seed, data hashes, environment versions, split manifest, git SHA, metrics, predictions, and logs. Experiment runners must reject dirty worktrees and must not overwrite an existing run directory. No number is allowed into the paper unless it exists in a verified artifact. ACI is an adaptive/online calibration method, not a batch method. MALT is not assumed to be a clean binary dataset. Negative or inconvenient results must be retained.
+Runs must retain configuration, seed, data hashes, environment versions, split
+manifest, git SHA, metrics, predictions, and logs. Experiment runners must
+reject dirty worktrees and must not overwrite an existing run directory. No
+number is allowed into a report or paper unless the tracked Gate D builder
+reconstructs it from an indexed verified artifact. ACI is an adaptive/online
+calibration method, not a batch method. Negative, null, and inconvenient results
+must be retained.

@@ -1,5 +1,10 @@
 # ADR-0008: C06 cap and calibration sensitivity
 
+## Status
+
+Accepted; implemented, executed, and independently verified as
+exploratory/appendix evidence. Numerical reporting remains pending Gate D.
+
 ## Decision
 
 C06 is a preregistered FD001-to-FD001 sensitivity analysis of the C02 split-conformal design. It evaluates four fixed conditions: `primary` (cap 125, calibration cut points 40–90%), `cap_130` (cap 130, 40–90%), `early_calibration` (cap 125, 40–65%), and `late_calibration` (cap 125, 65–90%). Every condition uses the same engine-level 60/20/20 split, five declared seeds, temporal windows, point-model hyperparameters, alpha values, endpoint evaluation, and 2,000-resample engine-level bootstrap policy as C02.

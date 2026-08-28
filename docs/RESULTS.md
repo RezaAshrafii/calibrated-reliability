@@ -1,65 +1,77 @@
-# Verified Results
+# Results reporting state
 
 ## Publication rule
 
-This file may contain numbers only when each number can be traced to an immutable experiment artifact generated from a clean commit and verified input registry. Do not fill this document from notebook output, memory, or an untracked local file.
+This file may contain numerical results only when a tracked deterministic
+builder reconstructs them from immutable, indexed, independently verified
+artifacts. Notebook output, memory, audit prose, and manual transcription are
+not reporting paths.
 
-At the current repository revision, the research runners and tests are implemented, but the official C-MAPSS raw data and generated experiment artifacts are intentionally excluded from Git. Therefore no scientific result is claimed here yet.
+Verified local artifacts exist for C01--C08, but generated outputs are ignored
+by Git and multiple superseded trees remain in the workspace. Until Gate D adds
+an artifact index, an allowed mixed-SHA policy, and `scripts/build_results.py`,
+all numerical result cells remain `PENDING`. `PENDING` must never be rendered as
+zero or omitted from a denominator.
+
+## Lifecycle state
+
+| Experiment | Implementation | Execution | Independent verification | Numerical reporting | Scientific role |
+|---|---|---|---|---|---|
+| C01 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | replication/context |
+| C02 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | replication/context |
+| C03 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | replication/context |
+| C04 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | replication/context |
+| C05 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | exploratory/appendix |
+| C06 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | exploratory/appendix |
+| C07 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | exploratory/appendix |
+| C08 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | exploratory/appendix; anchor saturation diagnostic |
+| C11 | NOT IMPLEMENTED | NOT EXECUTED | NOT VERIFIED | PENDING | candidate primary mechanism audit |
+| C12 | NOT IMPLEMENTED | NOT EXECUTED | NOT VERIFIED | PENDING | optional oracle/supporting diagnostic |
+
+The definitions of these terms are normative in `REPRODUCIBILITY.md`.
+
+## Gate D requirements
+
+Before any numerical table is added, the builder must:
+
+1. consume only artifact trees listed as `OFFICIAL` in a tracked artifact index;
+2. validate artifact and manifest hashes and reject missing files;
+3. use `pandas.read_csv(..., float_precision="round_trip")` for lossless numeric
+   reconstruction;
+4. retain seed-level values and separate raw from clipped targets/predictions;
+5. separate alpha `0.10` and `0.05`;
+6. record and allow cross-experiment Git-SHA differences only through an
+   explicit provenance field;
+7. emit `n_cal`, requested rank, effective rank, attainability, quantile regime,
+   policy, and distinct-quantile count for conformal rows where applicable;
+8. reproduce metrics and confidence intervals from stored predictions;
+9. fail closed on superseded, mixed-status, incomplete, or hash-mismatched
+   inputs; and
+10. generate deterministic tables without manual edits.
+
+## Claim boundary
+
+C01--C04 are replication and benchmark context. C05--C08 are exploratory or
+appendix evidence. C08 motivates the rank-attainability question but does not
+show that ACI generally fails under distribution shift. The candidate C11
+contribution is an application-level comparison with the exact Beta reference,
+not a new conformal theorem. Any C12 result must be labelled oracle-only and
+must not be described as a deployable target-domain repair.
 
 ## Reproduction
 
-~~~bash
-uv sync --locked --extra dev
-uv run python scripts/verify_data.py --registry data/registry.yaml --data-root data/raw
-uv run python scripts/run_c01_baseline.py \
-  --config configs/cmapss/fd001_baseline.yaml \
-  --registry data/registry.yaml
-uv run python scripts/run_c02_conformal.py \
-  --config configs/cmapss/conformal.yaml \
-  --registry data/registry.yaml
-~~~
-
-The runners refuse dirty worktrees, undeclared seeds, invalid input hashes and overwritten run directories.
-
-The repository now includes the C03 conformalized quantile regression runner. Its results remain pending until the registered raw data is verified and the immutable artifacts are generated.
-
-## C03 — conformalized quantile regression
-
-| Alpha | Coverage | Width | Normalized interval score | 95% CI | Artifact |
-|---:|---:|---:|---:|---|---|
-| 0.10 | pending | pending | pending | pending | pending |
-| 0.05 | pending | pending | pending | pending | pending |
-
-## C01 — point baselines
-
-| Model | Seed aggregation | RMSE | MAE | NASA score | 95% CI | Artifact |
-|---|---:|---:|---:|---:|---|---|
-| Mean | pending | pending | pending | pending | pending | pending |
-| Ridge | pending | pending | pending | pending | pending | pending |
-| HistGradientBoosting | pending | pending | pending | pending | pending | pending |
-
-## C02 — split conformal
-
-| Alpha | Coverage | Width | Normalized interval score | 95% CI | Artifact |
-|---:|---:|---:|---:|---|---|
-| 0.10 | pending | pending | pending | pending | pending |
-| 0.05 | pending | pending | pending | pending | pending |
-
-## Shift matrix
-
-| Train → test | Shift interpretation | Point metrics | Coverage | Width | Status |
-|---|---|---|---|---|---|
-| FD001 → FD001 | In-distribution | pending | pending | pending | Planned |
-| FD001 → FD002 | Operating-condition | pending | pending | pending | Planned |
-| FD001 → FD003 | Fault-mode/structural | pending | pending | pending | Planned |
-| FD001 → FD004 | Compound/structural | pending | pending | pending | Planned |
+Use `docs/RUNBOOK.md` for all C01--C08 commands. Raw data verification is local
+because `data/raw/` is intentionally excluded from Git; CI cannot certify the
+presence of official NASA files or local artifacts.
 
 ## Audit checklist
 
-- [ ] `verify_data.py` passed against the registered hashes.
-- [ ] All declared seeds completed.
-- [ ] The worktree was clean at run time.
-- [ ] Configuration, lockfile, git SHA and environment were retained.
-- [ ] Metrics were independently regenerated from stored predictions.
-- [ ] Negative findings and limitations were recorded.
-- [ ] No raw data, secret or personal path was committed.
+- [ ] Official and superseded artifact trees are indexed.
+- [ ] Every manifest and artifact hash matches.
+- [ ] Producing commits and clean-worktree status are verified.
+- [ ] Metrics and confidence intervals are reconstructed from stored rows.
+- [ ] Mixed Git SHAs are explicit rather than silently merged.
+- [ ] Conformal rank and attainability diagnostics are retained.
+- [ ] All rendered values originate from the tracked builder.
+- [ ] Negative and null findings remain present.
+- [ ] Raw data, secrets, outputs, and personal paths remain untracked.

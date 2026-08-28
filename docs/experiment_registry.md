@@ -1,22 +1,45 @@
 # Experiment registry
 
-| ID | Question | Method | Source → target | Unit | Alpha | Seed | Primary metric | Config path | Status |
+## Status contract
+
+The lifecycle terms are cumulative and use the operational definitions in
+`REPRODUCIBILITY.md`. In particular, `VERIFIED` requires matching hashes and
+provenance plus independent metric reconstruction. `REPORTED` requires the
+tracked Gate D results builder; it cannot be inferred from local output files.
+
+## Active completed experiments
+
+| ID | Role | Method | Source -> target | Unit | Alpha | Seeds | Config | Lifecycle | Reporting class |
 |---|---|---|---|---|---|---|---|---|---|
-| C01 | RQ1 | Baselines | FD001 → FD001 | engine endpoint | — | 13,37,73,101,137 | RMSE/MAE | configs/cmapss/fd001_baseline.yaml | implemented |
-| C02 | RQ2 | Split conformal | FD001 → FD001 | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/conformal.yaml | implemented |
-| C03 | RQ3 | CQR | FD001 → FD001 | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/cqr.yaml | implemented |
-| C04 | RQ4 | Shift matrix | FD001 → FD001/2/3/4 | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/shift_matrix.yaml | implemented |
-| C05 | RQ5 | Weighted conformal | FD001 → FD002/3/4 | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/weighted_conformal.yaml | implemented |
-| C06 | RQ6 | Sensitivity | FD001 → FD001 cap/calibration | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/sensitivity.yaml | implemented |
-| C07 | RQ4 | Regime-aware scaling | FD001 → FD001/2/4 | engine endpoint | — | 13,37,73,101,137 | RMSE/MAE | configs/cmapss/regime_scaling.yaml | implemented |
-| C08 | RQ5 | ACI | FD001 → FD001/2/3/4 | prequential engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/adaptive_conformal.yaml | implemented |
-| C09 | RQ6 | Seed sensitivity | all C-MAPSS | engine endpoint | .10,.05 | 13,37,73,101,137 | mean/std/CI | configs/cmapss/shift_matrix.yaml | planned |
-| C10 | RQ6 | Cap sensitivity | 125 vs 130 | engine endpoint | .10,.05 | 13,37,73,101,137 | coverage/width | configs/cmapss/conformal.yaml | planned |
-| M01 | RQ7 | MALT baseline | grouped split | transcript | — | 13,37,73,101,137 | AUPRC | configs/malt/baseline.yaml | planned |
-| M02 | RQ8 | Conformal classification | grouped split | transcript | .20,.10,.05 | 13,37,73,101,137 | conditional coverage | configs/malt/baseline.yaml | planned |
-| M03 | RQ7 | Text-only ablation | grouped split | transcript | — | 13,37,73,101,137 | AUPRC | configs/malt/baseline.yaml | planned |
-| M04 | RQ7 | Structural-only ablation | grouped split | transcript | — | 13,37,73,101,137 | AUPRC | configs/malt/baseline.yaml | planned |
-| M05 | RQ7 | Reasoning ablation | grouped split | transcript | — | 13,37,73,101,137 | AUPRC | configs/malt/baseline.yaml | planned |
-| M06 | RQ8 | LAC | grouped split | transcript | .20,.10,.05 | 13,37,73,101,137 | conditional coverage | configs/malt/baseline.yaml | planned |
-| M07 | RQ8 | APS | grouped split | transcript | .20,.10,.05 | 13,37,73,101,137 | conditional coverage | configs/malt/baseline.yaml | planned |
-| M08 | RQ8 | Optional LLM monitor | grouped split | transcript | — | 13,37,73,101,137 | AUPRC | configs/malt/baseline.yaml | planned |
+| C01 | RQ1 context | Point baselines | FD001 -> FD001 | engine endpoint | -- | 13,37,73,101,137 | `configs/cmapss/fd001_baseline.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | replication/context |
+| C02 | RQ1 context | Split conformal | FD001 -> FD001 | engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/conformal.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | replication/context |
+| C03 | RQ1 context | CQR | FD001 -> FD001 | engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/cqr.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | replication/context |
+| C04 | RQ1 context | Frozen shift matrix | FD001 -> FD001/2/3/4 | engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/shift_matrix.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | replication/context |
+| C05 | RQ2 motivation | Bounded weighted conformal | FD001 -> FD002/3/4 | engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/weighted_conformal.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | exploratory/appendix |
+| C06 | RQ2 sensitivity | Cap/cut-point sensitivity | FD001 -> FD001 | engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/sensitivity.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | exploratory/appendix |
+| C07 | RQ2 context | Regime-aware scaling | FD001 -> FD001/2/4 | engine endpoint | -- | 13,37,73,101,137 | `configs/cmapss/regime_scaling.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | exploratory/appendix |
+| C08 | RQ2 anchor diagnostic | Prequential ACI | FD001 -> FD001/2/3/4 | prequential engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/adaptive_conformal.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | exploratory/appendix |
+
+No C01--C08 row is `REPORTED`. Gate D must first identify official versus
+superseded output trees and reconstruct every published value automatically.
+
+## Candidate future work
+
+- C11 is not yet an experiment-registry entry. Gate N permits only design work
+  for a narrow engine-level rank-attainability/resolution audit. A dedicated ADR,
+  frozen configuration, tests, and independent C11-A review are required before
+  execution.
+- C12 is optional and secondary. If retained after C11, only Conditions A/B may
+  be designed, with an explicit `ORACLE / DIAGNOSTIC - NOT A DEPLOYMENT METHOD`
+  label, disjoint target calibration/evaluation, observation-policy controls,
+  and RUL-cap stratification.
+
+## Removed or deferred scope
+
+- Former C09 seed sensitivity is removed as a separate experiment: the declared
+  C01--C08 designs already execute all five frozen seeds.
+- Former C10 cap sensitivity is removed as a separate experiment: cap 125 versus
+  130 is implemented by C06.
+- MALT experiments M01--M08 are deferred and not implemented. They are outside
+  the current core study, as are C12-D, N-CMAPSS expansion, new deep models, and
+  dashboard/product work.

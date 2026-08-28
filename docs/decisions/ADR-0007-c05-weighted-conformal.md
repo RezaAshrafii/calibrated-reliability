@@ -1,5 +1,10 @@
 # ADR-0007: C05 weighted conformal calibration
 
+## Status
+
+Accepted; implemented, executed, and independently verified as bounded-weight
+exploratory/appendix evidence. Numerical reporting remains pending Gate D.
+
 ## Decision
 
 C05 evaluates weighted split-conformal RUL intervals from FD001 to FD002, FD003 and FD004. The FD001 fitted temporal transformer, point models and calibration endpoints are reused unchanged from the frozen C02 pipeline.

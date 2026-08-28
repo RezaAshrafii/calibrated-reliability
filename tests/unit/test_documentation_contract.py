@@ -1,0 +1,93 @@
+"""Regression tests for the Gate C documentation and scope contract."""
+
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def _read(relative_path: str) -> str:
+    return (ROOT / relative_path).read_text(encoding="utf-8")
+
+
+def _normalized(relative_path: str) -> str:
+    return " ".join(_read(relative_path).split())
+
+
+def test_active_registry_matches_reframed_scope() -> None:
+    registry = _read("docs/experiment_registry.md")
+
+    for experiment_id in range(1, 9):
+        assert f"| C{experiment_id:02d} |" in registry
+
+    for removed_id in ("C09", "C10", "M01", "M08"):
+        assert f"| {removed_id} |" not in registry
+
+    assert "C11 is not yet an experiment-registry entry" in registry
+    assert "MALT experiments M01--M08 are deferred and not implemented" in registry
+
+
+def test_readme_and_protocol_use_gate_n_claim_boundary() -> None:
+    readme = _normalized("README.md")
+    protocol = _normalized("docs/protocol.md")
+
+    assert "**In progress:** the MALT study" not in readme
+    assert "Gate N returned `REFRAME`" in readme
+    assert "C01--C04 are replication and benchmark context" in protocol
+    assert "C05--C08 are exploratory or appendix evidence" in protocol
+    assert "**RQ1 -- benchmark context:**" in protocol
+    assert "**RQ2 -- candidate primary mechanism:**" in protocol
+    assert "**RQ3 -- optional supporting diagnostic:**" in protocol
+    for retired_question in range(4, 9):
+        assert f"**RQ{retired_question}:**" not in protocol
+
+
+def test_future_experiments_remain_blocked_and_oracle_labeled() -> None:
+    protocol = _normalized("docs/protocol.md")
+    results = _read("docs/RESULTS.md")
+
+    assert "Independent C11-A review is required before execution" in protocol
+    oracle_label = "ORACLE / DIAGNOSTIC - NOT A DEPLOYMENT METHOD"
+    assert oracle_label in protocol
+    assert "| C11 | NOT IMPLEMENTED | NOT EXECUTED |" in results
+    assert "| C12 | NOT IMPLEMENTED | NOT EXECUTED |" in results
+
+
+def test_all_adrs_declare_status_and_malt_is_deferred() -> None:
+    adr_paths = sorted((ROOT / "docs" / "decisions").glob("ADR-*.md"))
+
+    assert adr_paths
+    for adr_path in adr_paths:
+        assert "## Status" in adr_path.read_text(encoding="utf-8"), adr_path.name
+
+    malt_adr = _read("docs/decisions/ADR-0002-malt-group-split.md")
+    assert "Deferred -- not implemented" in malt_adr
+
+
+def test_runbook_covers_every_completed_experiment() -> None:
+    runbook = _read("docs/RUNBOOK.md")
+
+    expected = {
+        "c01": ("run_c01_baseline.py", "fd001_baseline.yaml"),
+        "c02": ("run_c02_conformal.py", "conformal.yaml"),
+        "c03": ("run_c03_cqr.py", "cqr.yaml"),
+        "c04": ("run_c04_shift_matrix.py", "shift_matrix.yaml"),
+        "c05": ("run_c05_weighted_conformal.py", "weighted_conformal.yaml"),
+        "c06": ("run_c06_sensitivity.py", "sensitivity.yaml"),
+        "c07": ("run_c07_regime_scaling.py", "regime_scaling.yaml"),
+        "c08": ("run_c08_adaptive_conformal.py", "adaptive_conformal.yaml"),
+    }
+    for script_name, config_name in expected.values():
+        assert f"scripts/{script_name}" in runbook
+        assert f"configs/cmapss/{config_name}" in runbook
+
+
+def test_reporting_status_cannot_be_inferred_from_files() -> None:
+    reproducibility = _read("REPRODUCIBILITY.md")
+    results = _normalized("docs/RESULTS.md")
+
+    for status in ("PLANNED", "IMPLEMENTED", "EXECUTED", "VERIFIED", "REPORTED"):
+        assert f"`{status}`" in reproducibility
+
+    assert 'float_precision="round_trip"' in results
+    assert "all numerical result cells remain `PENDING`" in results
+    assert "PENDING` must never be rendered as zero" in results

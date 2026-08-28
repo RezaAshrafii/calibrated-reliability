@@ -1,5 +1,10 @@
 # ADR-0005: C03 conformalized quantile regression
 
+## Status
+
+Accepted; implemented, executed, and independently verified. Numerical
+reporting remains pending Gate D.
+
 ## Decision
 
 C03 evaluates conformalized quantile regression (CQR) on FD001 endpoints. For each primary alpha, two fixed `HistGradientBoostingRegressor` models are fit on base-train rows only: quantiles `(0.05, 0.95)` for alpha `0.10` and `(0.025, 0.975)` for alpha `0.05`. The models use the same train-only temporal features and fixed hyperparameters as C02.

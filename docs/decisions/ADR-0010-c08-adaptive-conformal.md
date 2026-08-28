@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted.
+Accepted; implemented, executed, and independently verified as
+exploratory/appendix evidence. Numerical reporting remains pending Gate D.
 
 ## Decision
 
