@@ -630,16 +630,21 @@ def _summary_rows(
                 if isinstance(item["value"], (int, float)) and not isinstance(item["value"], bool)
             ]
             values = np.asarray(numeric_values, dtype="float64")
+            complete_numeric_group = len(values) == len(group)
             source_shas = sorted({str(item["source_git_sha"]) for item in group})
             roots = sorted({str(item["artifact_root"]) for item in group})
             rows.append(
                 {
                     "result_type": result_type,
                     **dict(zip(grouping, key, strict=True)),
-                    "mean": float(values.mean()) if len(values) else PENDING,
-                    "sample_std": float(values.std(ddof=1)) if len(values) > 1 else PENDING,
-                    "minimum": float(values.min()) if len(values) else PENDING,
-                    "maximum": float(values.max()) if len(values) else PENDING,
+                    "mean": float(values.mean()) if complete_numeric_group else PENDING,
+                    "sample_std": (
+                        float(values.std(ddof=1))
+                        if complete_numeric_group and len(values) > 1
+                        else PENDING
+                    ),
+                    "minimum": float(values.min()) if complete_numeric_group else PENDING,
+                    "maximum": float(values.max()) if complete_numeric_group else PENDING,
                     "n_seeds": len({int(item["seed"]) for item in group}),
                     "n_numeric_values": len(values),
                     "source_git_shas": "|".join(source_shas),

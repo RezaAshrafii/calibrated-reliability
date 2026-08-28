@@ -167,6 +167,32 @@ def test_summary_is_deterministic_and_pending_is_not_zero() -> None:
     assert first[0]["n_numeric_values"] == 0
 
 
+def test_summary_never_drops_pending_seed_from_denominator() -> None:
+    base = {
+        "experiment_id": "C01",
+        "target": "FD001",
+        "condition": "primary",
+        "model": "mean",
+        "prediction_variant": "raw",
+        "metric": "nasa_score",
+        "source_git_sha": "a" * 40,
+        "artifact_root": "outputs/c01",
+        "manifest_sha256": "b" * 64,
+    }
+    rows = [
+        {**base, "seed": 13, "run_id": "run_13", "value": 1.0},
+        {**base, "seed": 37, "run_id": "run_37", "value": results.PENDING},
+    ]
+
+    summary = results._summary_rows(rows, [])[0]
+
+    assert summary["mean"] == results.PENDING
+    assert summary["minimum"] == results.PENDING
+    assert summary["maximum"] == results.PENDING
+    assert summary["n_seeds"] == 2
+    assert summary["n_numeric_values"] == 1
+
+
 def test_builder_is_deterministic_and_refuses_overwrite(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
