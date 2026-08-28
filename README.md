@@ -12,7 +12,7 @@ Reproducible study of calibrated predictive reliability under structured distrib
 
 **Implemented:** C01 point-prediction baselines, leakage-safe temporal features, engine-aware splits, C02 split-conformal intervals, C03 conformalized quantile regression, C04 frozen FD001 shift-matrix evaluation, C05 bounded pointwise weighted conformal sensitivity, C06 preregistered cap/calibration sensitivity analysis, C07 train-only regime-aware scaling, C08 prequential adaptive conformal inference, immutable provenance-tracked artifacts, and the CI quality gate.
 
-**In progress:** the MALT study. C08 is implemented as code and tests, while its official artifacts remain pending until independent review.
+**In progress:** the MALT study. C08 is implemented with independently checked official artifacts.
 
 ## Research scope
 

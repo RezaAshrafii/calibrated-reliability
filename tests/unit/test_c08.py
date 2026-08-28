@@ -1,10 +1,15 @@
 """C08 strict-configuration and frozen-pipeline tests."""
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pandas as pd
 import pytest
 
+from calibrated_reliability.experiments import artifacts as artifacts_module
+from calibrated_reliability.experiments.artifacts import write_c08_run
+from calibrated_reliability.experiments.c02 import C02Result
 from calibrated_reliability.experiments.c08 import C08Config, run_c08_seed
 
 
@@ -56,3 +61,69 @@ def test_c08_fits_fd001_once_then_reuses_the_pipeline(monkeypatch: pytest.Monkey
         target: f"test {target}" for target in config.targets
     }  # type: ignore[arg-type]
     assert calls == {"fit": 1, "evaluate": 4}
+
+
+def test_c08_artifact_records_fixed_path_bootstrap_and_is_immutable(tmp_path: Path) -> None:
+    """C08 manifests make the conditional bootstrap interpretation explicit."""
+    config_text = _config_text()
+    config_path = tmp_path / "adaptive.yaml"
+    config_path.write_text(config_text, encoding="utf-8")
+    registry_path = tmp_path / "registry.yaml"
+    registry_path.write_text("version: 1\nfiles: []\n", encoding="utf-8")
+    config = C08Config.from_yaml(config_text)
+    result = C02Result(
+        predictions=pd.DataFrame({"engine_id": [1], "y_true": [1.0]}),
+        calibration_scores=pd.DataFrame({"engine_id": [1]}),
+        metrics={},
+        partitions={"base_train": [1], "calibration": [2], "validation": [3]},
+        cut_points={2: 30},
+        quantiles={},
+        feature_names=["cycle"],
+    )
+    output = tmp_path / "outputs"
+    run_dir = write_c08_run(
+        output, "FD001", 13, "a" * 40, config, result, config_path, registry_path, {}
+    )
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["bootstrap_interpretation"] == (
+        "conditional_fixed_path_summary; ACI trajectory not rerun"
+    )
+    with pytest.raises(FileExistsError):
+        write_c08_run(
+            output, "FD001", 13, "a" * 40, config, result, config_path, registry_path, {}
+        )
+
+
+def test_c08_artifact_write_cleans_partial_directory_on_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed C08 write leaves no published or temporary directory."""
+    config_text = _config_text()
+    config_path = tmp_path / "adaptive.yaml"
+    config_path.write_text(config_text, encoding="utf-8")
+    registry_path = tmp_path / "registry.yaml"
+    registry_path.write_text("version: 1\nfiles: []\n", encoding="utf-8")
+    config = C08Config.from_yaml(config_text)
+    result = C02Result(
+        predictions=pd.DataFrame({"engine_id": [1], "y_true": [1.0]}),
+        calibration_scores=pd.DataFrame({"engine_id": [1]}),
+        metrics={},
+        partitions={},
+        cut_points={},
+        quantiles={},
+        feature_names=["cycle"],
+    )
+    original_write = artifacts_module._write_bytes
+
+    def fail_on_metrics(path: Path, content: bytes) -> str:
+        if path.name == "metrics.json":
+            raise OSError("simulated C08 artifact failure")
+        return original_write(path, content)
+
+    monkeypatch.setattr(artifacts_module, "_write_bytes", fail_on_metrics)
+    output = tmp_path / "outputs"
+    with pytest.raises(OSError, match="simulated C08 artifact failure"):
+        write_c08_run(
+            output, "FD001", 13, "a" * 40, config, result, config_path, registry_path, {}
+        )
+    assert list(output.iterdir()) == []
