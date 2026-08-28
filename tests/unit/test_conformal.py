@@ -277,3 +277,38 @@ def test_aci_rejects_update_before_prediction_and_future_outcomes_do_not_change_
     with pytest.raises(RuntimeError, match="predicted"):
         first.update(100.0)
     assert first.predict_interval(10.0) == second.predict_interval(10.0)
+
+
+def test_aci_future_outcomes_do_not_change_prior_intervals_or_alpha_states() -> None:
+    """Changing later revealed outcomes cannot retroactively affect the path."""
+    first = ACIState([1.0, 2.0, 3.0], 0.10, 0.01, 0.001, 0.999)
+    second = ACIState([1.0, 2.0, 3.0], 0.10, 0.01, 0.001, 0.999)
+    first_path = []
+    second_path = []
+    for current_first, current_second in zip((10.0, 10.0, 10.0), (10.0, 10.0, 10.0), strict=True):
+        first_path.append(first.predict_interval(current_first))
+        second_path.append(second.predict_interval(current_second))
+        first.update(10.0)
+        second.update(10.0)
+    assert first_path == second_path
+
+    altered = ACIState([1.0, 2.0, 3.0], 0.10, 0.01, 0.001, 0.999)
+    altered_path = []
+    for index, center in enumerate((10.0, 10.0, 10.0)):
+        altered_path.append(altered.predict_interval(center))
+        altered.update(10.0 if index == 0 else 1000.0)
+    assert altered_path[0] == first_path[0]
+    assert altered_path[1] == first_path[1]
+
+
+def test_aci_alpha_clips_at_both_declared_bounds() -> None:
+    """Repeated misses and hits respect the frozen alpha projection bounds."""
+    low = ACIState([1.0], 0.10, 1.0, 0.001, 0.999)
+    low.predict_interval(0.0)
+    _, alpha_after_miss = low.update(100.0)
+    assert alpha_after_miss == pytest.approx(0.001)
+
+    high = ACIState([1.0], 0.90, 1.0, 0.001, 0.999)
+    high.predict_interval(0.0)
+    _, alpha_after_hit = high.update(0.0)
+    assert alpha_after_hit == pytest.approx(0.999)
