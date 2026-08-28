@@ -48,3 +48,18 @@ an undeclared sensitivity condition.
   diagnostics.
 - Do not run C11 or C12 from this runbook. Neither has passed its required design
   gate.
+
+## Deterministic reporting
+
+The canonical C01--C08 tables were built from a clean checkout with:
+
+```bash
+uv run python scripts/build_results.py --index docs/artifact_index.yaml --output-root reports/results
+```
+
+The destination must not already exist; the builder never overwrites a report.
+For an independent byte-level reconstruction, use a new output root and compare
+its file hashes with `reports/results/provenance.json`. The builder rejects an
+unindexed output tree, a superseded or duplicate official selection, an
+incomplete run, a dirty worktree, mixed Git SHAs within one official tree, and
+every manifest or artifact hash mismatch.

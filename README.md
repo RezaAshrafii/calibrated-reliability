@@ -11,12 +11,12 @@ distribution shift using turbofan remaining-useful-life (RUL) prediction.
 
 ## Status
 
-**Implemented, executed, and independently verified:** C01--C08. These runs
+**Implemented, executed, independently verified, and deterministically reported:** C01--C08. These runs
 provide replication/context (C01--C04) and exploratory/appendix evidence
 (C05--C08); they are not presented as new conformal methods.
 
-**Current gate:** documentation and reporting infrastructure before any C11
-design. Gate N returned `REFRAME`: the surviving scientific scope is a narrow
+**Current gate:** independent review of the completed Gate D reporting system
+before any C11 design. Gate N returned `REFRAME`: the surviving scientific scope is a narrow
 application-level audit of engine-level conformal rank attainability and
 resolution, compared with the exact Beta reference and interpreted alongside
 the C-MAPSS observation mechanism.
@@ -72,9 +72,9 @@ and reporting state live in [docs/protocol.md](docs/protocol.md),
 [docs/experiment_registry.md](docs/experiment_registry.md),
 [docs/RUNBOOK.md](docs/RUNBOOK.md),
 [docs/NOVELTY_MATRIX.md](docs/NOVELTY_MATRIX.md), and
-[docs/RESULTS.md](docs/RESULTS.md). Verified local artifacts exist for C01--C08,
-but numerical tables remain `PENDING` until the tracked results builder can
-reconstruct them without manual transcription.
+[docs/RESULTS.md](docs/RESULTS.md). The tracked Gate D builder validates the
+official artifact index and reconstructs the C01--C08 tables without manual
+transcription. C11 and C12 remain ineligible for numerical reporting.
 
 ## Citation
 

@@ -11,17 +11,17 @@ tracked Gate D results builder; it cannot be inferred from local output files.
 
 | ID | Role | Method | Source -> target | Unit | Alpha | Seeds | Config | Lifecycle | Reporting class |
 |---|---|---|---|---|---|---|---|---|---|
-| C01 | RQ1 context | Point baselines | FD001 -> FD001 | engine endpoint | -- | 13,37,73,101,137 | `configs/cmapss/fd001_baseline.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | replication/context |
-| C02 | RQ1 context | Split conformal | FD001 -> FD001 | engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/conformal.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | replication/context |
-| C03 | RQ1 context | CQR | FD001 -> FD001 | engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/cqr.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | replication/context |
-| C04 | RQ1 context | Frozen shift matrix | FD001 -> FD001/2/3/4 | engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/shift_matrix.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | replication/context |
-| C05 | RQ2 motivation | Bounded weighted conformal | FD001 -> FD002/3/4 | engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/weighted_conformal.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | exploratory/appendix |
-| C06 | RQ2 sensitivity | Cap/cut-point sensitivity | FD001 -> FD001 | engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/sensitivity.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | exploratory/appendix |
-| C07 | RQ2 context | Regime-aware scaling | FD001 -> FD001/2/4 | engine endpoint | -- | 13,37,73,101,137 | `configs/cmapss/regime_scaling.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | exploratory/appendix |
-| C08 | RQ2 anchor diagnostic | Prequential ACI | FD001 -> FD001/2/3/4 | prequential engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/adaptive_conformal.yaml` | IMPLEMENTED / EXECUTED / VERIFIED | exploratory/appendix |
+| C01 | RQ1 context | Point baselines | FD001 -> FD001 | engine endpoint | -- | 13,37,73,101,137 | `configs/cmapss/fd001_baseline.yaml` | IMPLEMENTED / EXECUTED / VERIFIED / REPORTED | replication/context |
+| C02 | RQ1 context | Split conformal | FD001 -> FD001 | engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/conformal.yaml` | IMPLEMENTED / EXECUTED / VERIFIED / REPORTED | replication/context |
+| C03 | RQ1 context | CQR | FD001 -> FD001 | engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/cqr.yaml` | IMPLEMENTED / EXECUTED / VERIFIED / REPORTED | replication/context |
+| C04 | RQ1 context | Frozen shift matrix | FD001 -> FD001/2/3/4 | engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/shift_matrix.yaml` | IMPLEMENTED / EXECUTED / VERIFIED / REPORTED | replication/context |
+| C05 | RQ2 motivation | Bounded weighted conformal | FD001 -> FD002/3/4 | engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/weighted_conformal.yaml` | IMPLEMENTED / EXECUTED / VERIFIED / REPORTED | exploratory/appendix |
+| C06 | RQ2 sensitivity | Cap/cut-point sensitivity | FD001 -> FD001 | engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/sensitivity.yaml` | IMPLEMENTED / EXECUTED / VERIFIED / REPORTED | exploratory/appendix |
+| C07 | RQ2 context | Regime-aware scaling | FD001 -> FD001/2/4 | engine endpoint | -- | 13,37,73,101,137 | `configs/cmapss/regime_scaling.yaml` | IMPLEMENTED / EXECUTED / VERIFIED / REPORTED | exploratory/appendix |
+| C08 | RQ2 anchor diagnostic | Prequential ACI | FD001 -> FD001/2/3/4 | prequential engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/adaptive_conformal.yaml` | IMPLEMENTED / EXECUTED / VERIFIED / REPORTED | exploratory/appendix |
 
-No C01--C08 row is `REPORTED`. Gate D must first identify official versus
-superseded output trees and reconstruct every published value automatically.
+Every C01--C08 row is `REPORTED` through the tracked Gate D artifact index and
+deterministic builder. This status does not extend to C11 or C12.
 
 ## Candidate future work
 

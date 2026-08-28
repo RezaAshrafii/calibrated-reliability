@@ -1,0 +1,43 @@
+{
+  "artifact_index": {
+    "index_id": "c01_c08_gate_d",
+    "path": "docs/artifact_index.yaml",
+    "sha256": "16c2eec89741f4a6cecf9b3ab2524a9a95ad8025c3a4e0b4d7b7523a311e7325"
+  },
+  "builder_git_sha": "4a5c9cfee44c280424f3be3a22313c8b14a353c2",
+  "csv_float_parser": "pandas.read_csv(float_precision=\"round_trip\")",
+  "mixed_sha_policy": {
+    "mode": "allow_across_experiments_only",
+    "provenance_field": "source_git_shas",
+    "require_single_sha_per_official_tree": true
+  },
+  "official_artifact_roots": [
+    "outputs/c01_hardened",
+    "outputs/c02_final_review_319975d",
+    "outputs/c03_final_review_b542ee0",
+    "outputs/c04_final_hardened_3bf9206",
+    "outputs/c05_final_bounded_0cfbe63",
+    "outputs/c06_final_c86eff4",
+    "outputs/c07_final_8b6c6bf",
+    "outputs/c08_final_8468e13"
+  ],
+  "official_run_count": 105,
+  "pending_semantics": "PENDING is not zero and is never excluded as a numeric value",
+  "report_files": {
+    "artifact_runs.csv": "992662e6efaed816e01b77944af36de0fd8651c7a8cd104d461ec062feafadc4",
+    "interval_metrics_by_seed.csv": "18261bb81b443a410dbb03ae46a3de849448f4f2cfb4f86077df5e0579f83c96",
+    "point_metrics_by_seed.csv": "51753ed6ddb07737c03a8dc0e50beb3c2ef978d2a78962a4019b1325233e53bf",
+    "summary.csv": "67df7aff8296b2685d7a76f29b3fae1ec57d479bef953ec4d37d3b3153ead315"
+  },
+  "schema_version": 1,
+  "source_git_shas": [
+    "0cfbe6357863e5bffcf4b3223823d1323fd86b0a",
+    "2be1b54b55316be988cc9a21c5c6acf6294882a5",
+    "319975dc35d27f4edba0be75ccef69cb92077127",
+    "3bf92063fd99e23b7cbdf6a439a2fc4344807710",
+    "8468e13b7f2c7c3d937f0b4de6f5198e95e7b0b8",
+    "8b6c6bf96f05abb9a445fae98a7bba1bce888eb3",
+    "b542ee03a95a4e43fc142a2ae8cafb02ef6ca7e3",
+    "c86eff4203214cd7b64c5d908bb71cab69f7c555"
+  ]
+}

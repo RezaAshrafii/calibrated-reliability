@@ -80,8 +80,9 @@ C08 is an adaptive conformal prequential evaluation. It fits and calibrates the 
 
 RUL: RMSE, MAE, signed error, NASA asymmetric score, interval coverage,
 interval width, normalized interval score, and engine-level bootstrap confidence
-intervals. Completed metric artifacts are not automatically reportable; Gate D
-must reconstruct approved tables from indexed verified artifacts.
+intervals. Completed metric artifacts are reportable only through the tracked
+Gate D builder, which reconstructs the tables under `reports/results/` from
+indexed verified artifacts.
 
 ## Future design gates
 
@@ -105,7 +106,7 @@ remain deferred outside the current core study.
 Runs must retain configuration, seed, data hashes, environment versions, split
 manifest, git SHA, metrics, predictions, and logs. Experiment runners must
 reject dirty worktrees and must not overwrite an existing run directory. No
-number is allowed into a report or paper unless the tracked Gate D builder
-reconstructs it from an indexed verified artifact. ACI is an adaptive/online
+number is allowed into a report or paper unless the tracked Gate D builder has
+reconstructed it from an indexed verified artifact. ACI is an adaptive/online
 calibration method, not a batch method. Negative, null, and inconvenient results
 must be retained.

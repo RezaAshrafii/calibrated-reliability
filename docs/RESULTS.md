@@ -1,77 +1,68 @@
-# Results reporting state
+# Deterministic results reporting
 
 ## Publication rule
 
-This file may contain numerical results only when a tracked deterministic
-builder reconstructs them from immutable, indexed, independently verified
-artifacts. Notebook output, memory, audit prose, and manual transcription are
-not reporting paths.
+The only reportable C01--C08 values are the tracked outputs of
+`scripts/build_results.py`. The builder consumes only trees marked `OFFICIAL` in
+`docs/artifact_index.yaml`, validates every declared artifact hash, parses CSV
+files with `pandas.read_csv(..., float_precision="round_trip")`, reconstructs
+stored metrics and bootstrap intervals, and publishes atomically without
+overwriting an existing destination.
 
-Verified local artifacts exist for C01--C08, but generated outputs are ignored
-by Git and multiple superseded trees remain in the workspace. Until Gate D adds
-an artifact index, an allowed mixed-SHA policy, and `scripts/build_results.py`,
-all numerical result cells remain `PENDING`. `PENDING` must never be rendered as
-zero or omitted from a denominator.
+No research metric is manually transcribed into this Markdown file.
+
+## Tracked result tables
+
+- `reports/results/artifact_runs.csv`: one provenance row per official run.
+- `reports/results/point_metrics_by_seed.csv`: raw and clipped point metrics,
+  retained separately at seed level.
+- `reports/results/interval_metrics_by_seed.csv`: seed-level interval metrics,
+  bootstrap intervals, calibration size, rank attainability, quantile policy,
+  regime, and realized quantile-resolution diagnostics.
+- `reports/results/summary.csv`: deterministic across-seed aggregates with all
+  source run IDs, producing Git SHAs, artifact roots, and manifest hashes.
+- `reports/results/provenance.json`: artifact-index hash, builder revision,
+  mixed-SHA policy, official roots, source revisions, and report-file hashes.
+
+The classical integer order-statistic rank is not applicable to C05's weighted
+pointwise threshold. Those rank fields are explicitly `PENDING` and labelled
+`not_applicable_to_weighted_quantile`; they are never converted to zero. A raw
+NASA score that is numerically non-finite outside the clipped target support is
+also retained as `PENDING` with status `nonfinite_on_raw_support`. If any seed in
+an aggregate is `PENDING`, the aggregate remains `PENDING`; no denominator is
+silently reduced.
 
 ## Lifecycle state
 
 | Experiment | Implementation | Execution | Independent verification | Numerical reporting | Scientific role |
 |---|---|---|---|---|---|
-| C01 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | replication/context |
-| C02 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | replication/context |
-| C03 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | replication/context |
-| C04 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | replication/context |
-| C05 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | exploratory/appendix |
-| C06 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | exploratory/appendix |
-| C07 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | exploratory/appendix |
-| C08 | IMPLEMENTED | EXECUTED | VERIFIED | PENDING | exploratory/appendix; anchor saturation diagnostic |
-| C11 | NOT IMPLEMENTED | NOT EXECUTED | NOT VERIFIED | PENDING | candidate primary mechanism audit |
-| C12 | NOT IMPLEMENTED | NOT EXECUTED | NOT VERIFIED | PENDING | optional oracle/supporting diagnostic |
+| C01 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED | replication/context |
+| C02 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED | replication/context |
+| C03 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED | replication/context |
+| C04 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED | replication/context |
+| C05 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED | exploratory/appendix |
+| C06 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED | exploratory/appendix |
+| C07 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED | exploratory/appendix |
+| C08 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED | exploratory/appendix; anchor saturation diagnostic |
+| C11 | NOT IMPLEMENTED | NOT EXECUTED | NOT VERIFIED | NOT ELIGIBLE | candidate primary mechanism audit |
+| C12 | NOT IMPLEMENTED | NOT EXECUTED | NOT VERIFIED | NOT ELIGIBLE | optional oracle/supporting diagnostic |
 
-The definitions of these terms are normative in `REPRODUCIBILITY.md`.
-
-## Gate D requirements
-
-Before any numerical table is added, the builder must:
-
-1. consume only artifact trees listed as `OFFICIAL` in a tracked artifact index;
-2. validate artifact and manifest hashes and reject missing files;
-3. use `pandas.read_csv(..., float_precision="round_trip")` for lossless numeric
-   reconstruction;
-4. retain seed-level values and separate raw from clipped targets/predictions;
-5. separate alpha `0.10` and `0.05`;
-6. record and allow cross-experiment Git-SHA differences only through an
-   explicit provenance field;
-7. emit `n_cal`, requested rank, effective rank, attainability, quantile regime,
-   policy, and distinct-quantile count for conformal rows where applicable;
-8. reproduce metrics and confidence intervals from stored predictions;
-9. fail closed on superseded, mixed-status, incomplete, or hash-mismatched
-   inputs; and
-10. generate deterministic tables without manual edits.
+The lifecycle definitions are normative in `REPRODUCIBILITY.md`. `REPORTED`
+means deterministic publication from indexed verified artifacts; it does not
+promote exploratory C05--C08 evidence into a primary novelty claim.
 
 ## Claim boundary
 
-C01--C04 are replication and benchmark context. C05--C08 are exploratory or
-appendix evidence. C08 motivates the rank-attainability question but does not
+C01--C04 remain replication and benchmark context. C05--C08 remain exploratory
+or appendix evidence. C08 motivates the rank-attainability question but does not
 show that ACI generally fails under distribution shift. The candidate C11
 contribution is an application-level comparison with the exact Beta reference,
 not a new conformal theorem. Any C12 result must be labelled oracle-only and
 must not be described as a deployable target-domain repair.
 
-## Reproduction
+## Independent reconstruction
 
-Use `docs/RUNBOOK.md` for all C01--C08 commands. Raw data verification is local
-because `data/raw/` is intentionally excluded from Git; CI cannot certify the
-presence of official NASA files or local artifacts.
-
-## Audit checklist
-
-- [ ] Official and superseded artifact trees are indexed.
-- [ ] Every manifest and artifact hash matches.
-- [ ] Producing commits and clean-worktree status are verified.
-- [ ] Metrics and confidence intervals are reconstructed from stored rows.
-- [ ] Mixed Git SHAs are explicit rather than silently merged.
-- [ ] Conformal rank and attainability diagnostics are retained.
-- [ ] All rendered values originate from the tracked builder.
-- [ ] Negative and null findings remain present.
-- [ ] Raw data, secrets, outputs, and personal paths remain untracked.
+Use `docs/RUNBOOK.md` to build into a fresh output directory, then compare every
+generated file hash with `reports/results/provenance.json`. Raw data verification
+and official artifact availability remain local because `data/raw/` and
+`outputs/` are intentionally excluded from Git.

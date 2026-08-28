@@ -89,5 +89,21 @@ def test_reporting_status_cannot_be_inferred_from_files() -> None:
         assert f"`{status}`" in reproducibility
 
     assert 'float_precision="round_trip"' in results
-    assert "all numerical result cells remain `PENDING`" in results
-    assert "PENDING` must never be rendered as zero" in results
+    assert "C01--C08 are `IMPLEMENTED`, `EXECUTED`, `VERIFIED`, and `REPORTED`" in reproducibility
+    assert "reports/results/summary.csv" in results
+    assert "they are never converted to zero" in results
+    assert "the aggregate remains `PENDING`" in results
+    assert "| C11 | NOT IMPLEMENTED | NOT EXECUTED | NOT VERIFIED | NOT ELIGIBLE |" in results
+
+
+def test_gate_d_builder_and_artifact_index_are_the_only_reporting_path() -> None:
+    readme = _normalized("README.md")
+    runbook = _read("docs/RUNBOOK.md")
+    index = _read("docs/artifact_index.yaml")
+
+    assert "deterministically reported" in readme
+    assert "scripts/build_results.py" in runbook
+    assert "docs/artifact_index.yaml" in runbook
+    for experiment_id in range(1, 9):
+        assert f"experiment_id: C{experiment_id:02d}" in index
+    assert index.count("status: OFFICIAL") == 8

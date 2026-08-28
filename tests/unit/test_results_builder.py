@@ -14,6 +14,8 @@ import yaml
 
 from calibrated_reliability.reporting import results
 
+ROOT = Path(__file__).resolve().parents[2]
+
 
 def _hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -266,3 +268,40 @@ def test_failed_build_removes_temporary_directory(
 
     assert not destination.exists()
     assert not list(tmp_path.glob(".failed.*"))
+
+
+def test_tracked_gate_d_reports_match_their_provenance_hashes() -> None:
+    report_root = ROOT / "reports" / "results"
+    provenance = json.loads((report_root / "provenance.json").read_text(encoding="utf-8"))
+
+    assert provenance["schema_version"] == 1
+    assert len(provenance["builder_git_sha"]) == 40
+    assert provenance["official_run_count"] == 105
+    assert len(provenance["source_git_shas"]) == 8
+    for filename, expected_hash in provenance["report_files"].items():
+        assert _hash(report_root / filename) == expected_hash
+
+
+def test_tracked_tables_preserve_pending_and_rank_semantics() -> None:
+    report_root = ROOT / "reports" / "results"
+    point = pd.read_csv(
+        report_root / "point_metrics_by_seed.csv",
+        dtype=str,
+        keep_default_na=False,
+        float_precision="round_trip",
+    )
+    interval = pd.read_csv(
+        report_root / "interval_metrics_by_seed.csv",
+        dtype=str,
+        keep_default_na=False,
+        float_precision="round_trip",
+    )
+
+    pending_point = point.loc[point["value"] == results.PENDING]
+    assert not pending_point.empty
+    assert set(pending_point["metric_status"]) == {"nonfinite_on_raw_support"}
+    weighted = interval.loc[interval["experiment_id"] == "C05"]
+    assert set(weighted["requested_rank_min"]) == {results.PENDING}
+    assert set(weighted["unattainable_rank_policy"]) == {"not_applicable_to_weighted_quantile"}
+    adaptive = interval.loc[interval["experiment_id"] == "C08"]
+    assert set(adaptive["unattainable_rank_policy"]) == {"legacy_max_clamp"}

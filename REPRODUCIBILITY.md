@@ -17,9 +17,10 @@ split manifests, predictions, and metrics can be traced together.
   verified artifacts. File presence or manual transcription never establishes
   this status.
 
-C01--C08 are `IMPLEMENTED`, `EXECUTED`, and `VERIFIED`, but not yet `REPORTED`.
-Gate D must index the official and superseded artifact trees and provide the
-only allowed numerical reporting path.
+C01--C08 are `IMPLEMENTED`, `EXECUTED`, `VERIFIED`, and `REPORTED`. Gate D uses
+`docs/artifact_index.yaml` and `scripts/build_results.py` as the only allowed
+numerical reporting path. C11 and C12 are not implemented and are not eligible
+for reporting.
 
 ## Reproduction contract
 
@@ -36,8 +37,8 @@ only allowed numerical reporting path.
    existing artifact tree.
 9. Verify manifest hashes, producing commit, configuration, data provenance,
    splits, predictions, and recomputed metrics before assigning `VERIFIED`.
-10. Do not place a number in `docs/RESULTS.md` or a manuscript until the Gate D
-    builder reproduces it from an indexed verified artifact.
+10. Use only the Gate D tables under `reports/results/` for C01--C08 numerical
+    reporting; do not transcribe values from notebooks, audit prose, or memory.
 
 Raw data and generated outputs are intentionally excluded from Git. Their
 absence from a clean clone means local data and artifact verification is not a
