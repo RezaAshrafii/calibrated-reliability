@@ -27,6 +27,8 @@ deterministic builder. This status does not extend to C11 or C12.
 
 - C11 is not yet an experiment-registry entry. Proposed ADR-0012 specifies the
   narrow FD001 engine-level finite-reservoir rank-attainability/resolution audit.
+  It is retrospectively motivated and prospectively frozen as a descriptive
+  audit, not confirmatory preregistration.
   It must pass independent C11-A design review before configuration or production
   implementation; implementation tests and a separate readiness review are
   required before execution.

@@ -26,6 +26,12 @@ coverage variation are prior theory, not project contributions. C08 is only the
 anchor diagnostic that motivated C11; C11 must not be framed as proving that
 ACI generally fails under shift.
 
+C11 is a retrospectively motivated, prospectively frozen descriptive audit.
+Its design follows inspection of completed C01--C08 outcomes and is therefore
+not confirmatory preregistration. Freezing this ADR before any C11 computation
+prevents further result-dependent choices, but it does not erase the prior
+outcome inspection or authorize confirmatory inference.
+
 ## Frozen scope and data roles
 
 C11 is an FD001-to-FD001 mechanism audit. Target-shift and target-label
@@ -50,9 +56,14 @@ The design freezes:
   only on the 60 predictor-fit engines;
 - RUL cap: `125` for fitting targets, reservoir truth, evaluation truth,
   prediction centers, and normalized interval score;
-- calibration endpoint policy: one cut point per reservoir engine, generated
-  once over the sorted 40-engine reservoir with seed `13`, minimum 30 observed
-  cycles, and the 40--90% complete-trajectory range;
+- calibration endpoint policy: exactly the existing
+  `calibrated_reliability.data.splitting.generate_cut_points` algorithm, applied
+  once to the sorted 40-engine reservoir under Python 3.11.9. One
+  `random.Random(13)` instance is initialized before the loop. For each engine
+  in ascending integer-ID order, complete lifetime `L` gives inclusive bounds
+  `lower=max(30, ceil(0.40*L))` and `upper=floor(0.90*L)`; exactly one inclusive
+  `rng.randint(lower, upper)` draw is consumed. `lower > upper`, a missing
+  engine, an extra draw, a reordered engine list, or another RNG fails closed;
 - interval form: a C02-style clipped point center with a symmetric, unbounded
   split-conformal interval.
 
@@ -82,7 +93,7 @@ not part of the scientific estimand. A fixed-seed Monte Carlo calculation may
 exist only as a software-verification test against exact enumeration and must
 not be published as C11 evidence.
 
-## Preregistered cells and attainability
+## Frozen analysis cells and attainability
 
 Let `N=40` be the reservoir size and
 
@@ -103,8 +114,16 @@ The cross-product cells `(10, 0.05)` and `(15, 0.05)` are excluded because
 their requested ranks 11 and 16 exceed their calibration sizes. They must be
 represented in design validation as
 `not_evaluated_due_to_unattainable_finite_rank`; they must not use infinity,
-`legacy_max_clamp`, a sentinel zero, or an imputed quantile. `n_cal=40` is also
-excluded because a 40-of-40 subset has no calibration-subset variation.
+`legacy_max_clamp`, a sentinel zero, or an imputed quantile. Both `n_cal=40`
+cells are retained as declared exclusions with status
+`not_evaluated_due_to_degenerate_full_reservoir_subset`, because a 40-of-40
+subset has no calibration-subset variation; they are not silently omitted.
+
+The size ladder is frozen for design coverage rather than selected from C11
+outcomes: sizes 10 and 15 exercise low-budget sample-maximum regimes at alpha
+0.10, size 20 reproduces the historical C02 engine budget, and size 30 adds a
+larger-budget interior cell while leaving ten reservoir engines outside each
+subset. No intermediate or post-result size may be added.
 
 The support interval follows from `r <= k <= N - n_cal + r`. The listed support
 size is an upper bound on distinct numerical quantiles because tied reservoir
@@ -120,10 +139,16 @@ position `k` is
 `P(K=k) = C(k-1, r-1) * C(N-k, n-r) / C(N, n)`,
 
 for `k=r,...,N-n+r`. Integer combination counts are retained exactly; floating
-probabilities are derived only for reporting. Equal residual values are merged
-by summing their position probabilities. Probability mass must sum to one
-within a declared numerical tolerance, and the implementation must fail closed
-otherwise.
+probabilities are derived only for reporting. Before floating conversion, the
+integer multiplicities must sum exactly to `C(N,n)`. After conversion, reported
+probability mass must differ from one by no more than `1e-12`.
+
+Residual ties mean exact equality of the stored round-trip `float64` residual
+values; no rounding or tolerance-based grouping is permitted. Equal residuals
+are merged by summing their integer multiplicities before probability
+conversion. Position-level multiplicities and the inclusive minimum/maximum
+reservoir positions contributing to every tied quantile are retained. A failed
+integer identity, probability check, or tie reconstruction fails closed.
 
 For each supported quantile `q`, the fixed official evaluation scores determine
 without resampling:
@@ -147,7 +172,7 @@ latent calibration-conditional coverage is
 `P ~ Beta(r, n_cal + 1 - r)`.
 
 This is an analytic reference, not a claimed law for the fixed C-MAPSS
-reservoir and official endpoint set. For each cell the ADR preregisters its
+reservoir and official endpoint set. For each cell the ADR freezes its
 Beta mean, standard deviation, 5th and 10th percentiles, and probability below
 the severe-undercoverage threshold.
 
@@ -163,9 +188,32 @@ continuous Beta CDF. Mandatory secondary discrepancies are:
 Because empirical coverage is observed on exactly 100 fixed endpoints, C11
 must additionally report the Beta-binomial projection obtained by mixing
 `Binomial(100, P)` over the same Beta law. Distances to this finite-evaluation
-reference distinguish endpoint-grid effects from larger departures. Neither
-reference licenses a causal attribution to engine dependence or observation
-policy.
+reference quantify sensitivity to the idealized 100-endpoint coverage grid;
+they do not isolate grid effects from endpoint dependence or observation-policy
+mismatch. Neither reference licenses a causal attribution.
+
+For `a=r`, `b=n_cal+1-r`, and `M=100`, the Beta-binomial reference has support
+`c_j=j/M`, `j=0,...,M`, and mass
+
+`P(J=j) = C(M,j) * B(j+a, M-j+b) / B(a,b)`.
+
+Every cell reports the same five discrepancies separately against both
+references: KS distance, signed mean difference, signed severe-tail difference,
+signed standard-deviation difference, and 1-Wasserstein distance. A signed
+difference is always `finite_reservoir - reference`. The severe tail is
+strictly `coverage < (1-alpha)-0.10`; for the discrete Beta-binomial reference,
+only support points satisfying that strict inequality contribute.
+
+Let `F` be the exact weighted finite-reservoir coverage CDF and `G` a reference
+CDF. KS is `sup_x |F(x)-G(x)|`. It is computed exactly over the union of their
+finite jump locations, evaluating both the left limit and right-continuous CDF
+at every location; for continuous Beta, `G(x-)=G(x)`. Wasserstein-1 is
+`integral_0^1 |F(x)-G(x)| dx`, in coverage-probability units, evaluated exactly
+piecewise for discrete/discrete comparison and by deterministic numerical
+quadrature with absolute and relative tolerances `1e-12` for the continuous
+Beta comparison. Means and population standard deviations use exact probability
+weights. All reconstructed scalar discrepancies must match within
+`atol=1e-12, rtol=1e-12`.
 
 No p-value, model selection, cell selection, or pooled headline statistic is
 used. All four alpha-0.10 cells are the primary family and are reported
@@ -209,8 +257,10 @@ selection:
 
 - reservoir cut-cycle and complete-lifetime distributions;
 - official test observed-cycle distribution;
-- a label-free distance between the reservoir cut-cycle and test endpoint-cycle
-  distributions;
+- the equally engine-weighted empirical 1-Wasserstein distance, in observed
+  cycle units, between the 40 reservoir cut cycles and 100 official test
+  endpoint cycles; this is the sole scalar observation-distance diagnostic and
+  uses no RUL label, sensor value, prediction, or residual;
 - the fraction of evaluation endpoints whose raw RUL exceeds cap 125;
 - residual ties and the resulting reduction in distinct quantile support.
 
@@ -252,10 +302,16 @@ least:
   attainability, regime, support-index range, combination count, and
   finite-population factor;
 - `quantile_distribution.csv`: position, quantile, exact integer multiplicity,
-  probability, exact induced coverage, width, and normalized interval score;
+  contributing position bounds, probability, exact induced coverage, width,
+  and normalized interval score;
+- `beta_binomial_distribution.csv`: all 101 coverage-grid points and their
+  probability for every evaluated cell;
+- `reference_summary.json`: continuous-Beta parameters, analytic summaries,
+  formula identifiers, strict tail threshold, CDF conventions, Wasserstein
+  quadrature tolerances, and the fixed evaluation count `M=100`;
 - `distribution_summary.csv`: finite-reservoir summaries, continuous Beta and
-  beta-binomial references, preregistered discrepancy measures, tie diagnostics,
-  and explicit status;
+  beta-binomial references, all five separately named discrepancies against
+  each reference, tie diagnostics, and explicit status;
 - `observation_mechanism.json`: the fixed descriptive diagnostics above.
 
 No table may collapse an excluded cell into zero or omit it from a declared
@@ -271,6 +327,8 @@ The later implementation checkpoint must add behavioral tests for:
 - exclusion of reservoir engines from temporal and model fitting;
 - one HGB/transformer fit and identity preservation throughout enumeration;
 - fixed cut points and full-trajectory truth before prefix truncation;
+- exact agreement of the 40-engine cut-point vector with the frozen
+  `random.Random(13)` algorithm, including draw order and inclusive bounds;
 - one residual per reservoir engine and one endpoint score per official engine;
 - exact endpoint/RUL alignment and ordered IDs 1 through 100;
 - prohibited feature and future-row isolation;
@@ -281,9 +339,15 @@ The later implementation checkpoint must add behavioral tests for:
 - exact-enumeration agreement with brute-force subset enumeration on small
   synthetic reservoirs;
 - fixed-seed Monte Carlo convergence as a software check only;
-- analytic Beta values and beta-binomial projection;
+- analytic Beta values and the complete 101-point beta-binomial projection;
+- KS left/right jump handling and Wasserstein calculations against both
+  references;
+- signed mean, tail-probability, and population-SD discrepancy orientation;
+- exact residual-tie equality and the frozen `1e-12` tolerances;
+- the observed-cycle 1-Wasserstein diagnostic in cycle units and proof that it
+  is label-free;
 - expected non-monotone alpha-0.10 reference tail probabilities;
-- all preregistered discrepancy calculations;
+- all frozen discrepancy calculations;
 - strict adversarial configuration validation;
 - deterministic repeated execution;
 - complete artifact schema and hashes;
@@ -291,18 +355,27 @@ The later implementation checkpoint must add behavioral tests for:
 - independent summary reconstruction from retained score and distribution
   artifacts.
 
-## Interpretation and stop rules
+## Interpretation and non-selective stop rule
 
 Allowed conclusions are conditional on the single frozen predictor, fixed
 40-engine reservoir, fixed cut policy, and fixed official FD001 evaluation set.
 Empirical subset probabilities are not deployment-failure probabilities.
 
-If the finite-reservoir distribution is adequately explained by the continuous
-Beta and finite-evaluation beta-binomial references, C11 reports that null
-result and does not claim a new prognostics mechanism. If a material departure
-remains, it is descriptive evidence requiring cautious interpretation against
-the observation-mechanism and finite-reservoir diagnostics; it is not proof of
-causation or universal conformal failure.
+C11 makes no binary `adequately_explained`, `material_departure`, success, or
+failure classification. It reports every frozen discrepancy with its sign and
+units, whether zero, small, large, or inconvenient. A non-finite discrepancy
+fails closed and is retained as an explicit computation failure, not a
+scientific value. No observed value changes the evaluated cells, reference
+family, follow-on work, reporting denominator, or claim boundary. An absolute
+difference within the frozen reconstruction tolerance means numerical agreement
+only; it is not acceptance of a null hypothesis. A nonzero discrepancy is
+benchmark-specific descriptive evidence, not proof of causation, a new
+prognostics mechanism, or universal conformal failure.
+
+This non-selective rule replaces the ambiguous phrases `adequately explained`
+and `material departure`. C12 is not automatically triggered by any C11 value;
+it remains subject to its own scientific-necessity decision, dedicated ADR, and
+independent review after C11 closes.
 
 C12 remains blocked until C11 is implemented, executed, independently
 reconstructed, and reviewed. C12-D, MALT, N-CMAPSS, new deep models, shift
@@ -310,10 +383,10 @@ repair methods, and dashboard/product work remain out of scope.
 
 ## Consequences
 
-This design replaces an underpowered 50-draw fragility study with an exact
+This design replaces the earlier proposed 50-draw fragility study with an exact
 conditional finite-reservoir audit. It removes calibration-draw Monte Carlo
 error and freezes cut points so engine-subset selection is the only conceptual
-random variable. It also makes the known Beta/rank behavior a preregistered
+random variable. It also makes the known Beta/rank behavior a frozen analytic
 reference rather than a result to be rediscovered.
 
 The design does not yet authorize implementation or execution. A high-level

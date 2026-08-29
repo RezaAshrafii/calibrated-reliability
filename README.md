@@ -20,7 +20,9 @@ Gate D passed independent review; no C11 implementation or execution is yet
 authorized. Gate N returned `REFRAME`: the surviving scientific scope is a narrow
 application-level audit of engine-level conformal rank attainability and
 resolution, compared with the exact Beta reference and interpreted alongside
-the C-MAPSS observation mechanism.
+the C-MAPSS observation mechanism. C11 is retrospectively motivated by the
+completed outcomes and prospectively frozen only before its own computation;
+it is a descriptive audit, not confirmatory preregistration.
 
 **Not implemented:** C11 and C12. C11 now has a proposed design ADR that must
 pass independent review before implementation. C12 is optional, oracle-only supporting

@@ -156,9 +156,20 @@ def test_c11_proposed_design_is_exact_and_execution_remains_blocked() -> None:
     assert "Beta(r, n_cal + 1 - r)" in adr
     assert "Beta-binomial projection" in adr
     assert "not_evaluated_due_to_unattainable_finite_rank" in adr
+    assert "not_evaluated_due_to_degenerate_full_reservoir_subset" in adr
+    assert "random.Random(13)" in adr
+    assert "rng.randint(lower, upper)" in adr
+    assert "same five discrepancies separately against both references" in adr
+    assert "evaluating both the left limit and right-continuous CDF" in adr
+    assert "atol=1e-12, rtol=1e-12" in adr
+    assert "empirical 1-Wasserstein distance, in observed cycle units" in adr
+    assert "makes no binary `adequately_explained`" in adr
+    assert "retrospectively motivated, prospectively frozen descriptive audit" in adr
     assert "does not yet authorize implementation or execution" in adr
     assert "independent C11-A review" in readme
+    assert "not confirmatory preregistration" in readme
     assert "Independent C11-A review is required before config" in protocol
+    assert "No binary adequacy or material-departure classification" in protocol
     assert "C11 is not yet an experiment-registry entry" in registry
     assert "run_c11" not in runbook
     assert not (ROOT / "configs" / "cmapss" / "c11.yaml").exists()
