@@ -44,6 +44,11 @@ Manifest-declared artifact names must be direct regular filenames inside the
 same run directory. Absolute paths, path separators, parent traversal, and
 symbolic-link escapes are rejected.
 
+Manifest discovery is recursive, while valid manifests must occur exactly one
+directory below an indexed tree as `run_directory/manifest.json`. A nested or
+otherwise relocated manifest is therefore detected and rejected rather than
+silently ignored.
+
 The index does not make an artifact `VERIFIED` by declaration. The Gate D
 builder independently validates manifests and hashes and reconstructs stored
 metrics from `predictions.csv` using `float_precision="round_trip"`.

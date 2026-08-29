@@ -5,11 +5,11 @@
 Run experiments only after all of the following succeed:
 
 ```bash
-uv sync --locked --extra dev
+uv sync --locked --python 3.11.9 --extra dev
 uv run python scripts/verify_data.py --registry data/registry.yaml --data-root data/raw
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy --python-version 3.13 src
+uv run mypy --python-version 3.11 src
 uv run mypy --no-site-packages --disable-error-code=untyped-decorator scripts
 uv run pytest -q
 git status --short
@@ -58,13 +58,16 @@ uv run python scripts/build_results.py --index docs/artifact_index.yaml --output
 ```
 
 The destination must not already exist; the builder never overwrites a report.
-For a full byte-level reconstruction, first check out the clean
-`builder_git_sha` recorded in `reports/results/provenance.json`, use a new output
-root, and compare every generated file with `reports/results/checksums.sha256`.
-Running from a later clean commit should reproduce the four numerical CSV files,
-but it must record the later executing SHA, so `provenance.json` and
-`checksums.sha256` will intentionally differ. The builder rejects an unindexed
-output tree, a superseded or duplicate official selection, an incomplete or
-substituted run matrix, a dirty worktree, mixed Git SHAs within one official
-tree, a manifest-set digest mismatch, path traversal, and every manifest or
-artifact hash mismatch.
+For a full byte-level reconstruction, first reproduce the clean
+`builder_git_sha` and exact `environment` recorded in
+`reports/results/provenance.json`, including Python 3.11.9, platform, direct
+package versions, `.python-version` hash, and `uv.lock` hash. Use a new output
+root and compare every generated file with `reports/results/checksums.sha256`.
+A later clean commit or different environment must record its own provenance;
+last-bit floating-point serialization is not promised across environments. The
+builder rejects an unindexed output tree, a superseded or duplicate official
+selection, an incomplete or substituted run matrix, a dirty worktree, mixed Git
+SHAs within one official tree, a manifest-set digest mismatch, nested manifest,
+path traversal, and every manifest or artifact hash mismatch. Git state,
+environment, and official artifacts are revalidated immediately before final
+publication.

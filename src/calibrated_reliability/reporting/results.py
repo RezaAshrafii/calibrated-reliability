@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import importlib.metadata
 import json
 import math
+import platform
+import re
 import shutil
 import subprocess
 import tempfile
@@ -314,6 +317,42 @@ def _manifest_set_digest(tree: Path, manifests: list[Path]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _direct_runtime_package_names() -> tuple[str, ...]:
+    distribution = importlib.metadata.distribution("calibrated-reliability")
+    names = {"calibrated-reliability"}
+    for requirement in distribution.requires or ():
+        if "extra ==" in requirement:
+            continue
+        name = re.split(r"[\s<>=!~;\[]", requirement, maxsplit=1)[0]
+        if name:
+            names.add(name)
+    return tuple(sorted(names, key=str.casefold))
+
+
+def _builder_environment(repository_root: Path) -> dict[str, Any]:
+    version_path = repository_root / ".python-version"
+    if not version_path.is_file():
+        raise FileNotFoundError("Gate D requires a tracked .python-version")
+    expected_python = version_path.read_text(encoding="utf-8").strip()
+    observed_python = platform.python_version()
+    if observed_python != expected_python:
+        raise ValueError(
+            f"Gate D requires Python {expected_python}; running interpreter is {observed_python}"
+        )
+    lock_path = repository_root / "uv.lock"
+    if not lock_path.is_file():
+        raise FileNotFoundError("Gate D requires uv.lock")
+    packages = {name: importlib.metadata.version(name) for name in _direct_runtime_package_names()}
+    return {
+        "python": observed_python,
+        "implementation": platform.python_implementation(),
+        "platform": platform.platform(),
+        "packages": packages,
+        "python_version_file": {"path": ".python-version", "sha256": _sha256(version_path)},
+        "lockfile": {"path": "uv.lock", "sha256": _sha256(lock_path)},
+    }
+
+
 def _safe_artifact_filename(value: Any, manifest_path: Path) -> str:
     if (
         not isinstance(value, str)
@@ -390,17 +429,20 @@ def verify_indexed_artifacts(
     official_runs: list[VerifiedRun] = []
     for entry in index.entries:
         tree = repository_root / PurePosixPath(entry.path)
-        manifests = sorted(tree.glob("*/manifest.json"), key=lambda path: path.as_posix())
+        manifests = sorted(tree.rglob("manifest.json"), key=lambda path: path.as_posix())
+        observed_manifest_digest = _manifest_set_digest(tree, manifests)
+        if observed_manifest_digest != index.manifest_set_sha256[entry.path]:
+            raise ValueError(f"Manifest-set hash mismatch for {entry.path}")
         if len(manifests) != entry.expected_manifest_count:
             raise ValueError(
                 f"Manifest count mismatch for {entry.path}: "
                 f"expected {entry.expected_manifest_count}, found {len(manifests)}"
             )
-        observed_manifest_digest = _manifest_set_digest(tree, manifests)
-        if observed_manifest_digest != index.manifest_set_sha256[entry.path]:
-            raise ValueError(f"Manifest-set hash mismatch for {entry.path}")
         observed_shas: set[str] = set()
         for manifest_path in manifests:
+            relative_manifest = manifest_path.relative_to(tree)
+            if len(relative_manifest.parts) != 2:
+                raise ValueError(f"Manifest must be a direct run child: {manifest_path}")
             manifest = _json(manifest_path)
             run_dir = manifest_path.parent
             if manifest.get("experiment_id") != entry.experiment_id:
@@ -886,6 +928,7 @@ def build_results(
     if output_root.exists():
         raise FileExistsError(output_root)
     resolved_builder_sha = _builder_sha(repository_root)
+    resolved_environment = _builder_environment(repository_root)
     index = load_artifact_index(index_path)
     runs = verify_indexed_artifacts(repository_root, index)
     if {run.entry.experiment_id for run in runs} != set(REQUIRED_EXPERIMENTS):
@@ -906,9 +949,10 @@ def build_results(
         _write_csv(temporary / "summary.csv", summary_rows)
         report_files = sorted(path for path in temporary.iterdir() if path.is_file())
         provenance = {
-            "schema_version": 2,
+            "schema_version": 3,
             "builder_git_sha": resolved_builder_sha,
             "builder_git_clean": True,
+            "environment": resolved_environment,
             "artifact_index": {
                 "path": index_path.relative_to(repository_root).as_posix(),
                 "sha256": _sha256(index_path),
@@ -933,6 +977,19 @@ def build_results(
             f"{_sha256(path)}  {path.name}\n" for path in sorted(checksum_targets)
         ).encode("utf-8")
         (temporary / "checksums.sha256").write_bytes(checksum_content)
+        final_runs = verify_indexed_artifacts(repository_root, index)
+        initial_run_identity = [
+            (run.entry.path, run.run_dir.name, run.manifest_sha256) for run in runs
+        ]
+        final_run_identity = [
+            (run.entry.path, run.run_dir.name, run.manifest_sha256) for run in final_runs
+        ]
+        if final_run_identity != initial_run_identity:
+            raise ValueError("Official artifact identity changed during report construction")
+        if _builder_environment(repository_root) != resolved_environment:
+            raise ValueError("Builder environment changed during report construction")
+        if _builder_sha(repository_root) != resolved_builder_sha:
+            raise ValueError("Builder Git revision changed during report construction")
         if output_root.exists():
             raise FileExistsError(output_root)
         temporary.rename(output_root)

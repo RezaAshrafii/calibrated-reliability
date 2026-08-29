@@ -4,7 +4,7 @@ Reproducible study of calibrated predictive reliability under structured
 distribution shift using turbofan remaining-useful-life (RUL) prediction.
 
 [![CI](https://github.com/RezaAshrafii/calibrated-reliability/actions/workflows/ci.yml/badge.svg)](https://github.com/RezaAshrafii/calibrated-reliability/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.11.9-3776AB.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 > This is a reproducible research repository, not a claim of SOTA or universal safety guarantees. No result is reported until it is generated from a verified artifact.
@@ -37,10 +37,10 @@ effects, universal shift guarantees, or state-of-the-art performance. See
 ## Quickstart
 
 ```bash
-uv sync --locked --extra dev
+uv sync --locked --python 3.11.9 --extra dev
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy --python-version 3.13 src
+uv run mypy --python-version 3.11 src
 uv run mypy --no-site-packages --disable-error-code=untyped-decorator scripts
 uv run pytest -q
 ```

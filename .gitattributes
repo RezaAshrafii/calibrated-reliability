@@ -1,3 +1,5 @@
+.python-version text eol=lf
+uv.lock text eol=lf
 docs/artifact_index.yaml text eol=lf
 reports/results/*.csv text eol=lf
 reports/results/*.json text eol=lf

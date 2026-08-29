@@ -121,3 +121,18 @@ def test_gate_d_reconstruction_and_trust_anchor_are_explicit() -> None:
     assert "checksums.sha256" in runbook
     assert "later clean revision" in results
     assert "exact official run contracts" in reproducibility
+
+
+def test_gate_d_environment_is_exact_and_revalidated() -> None:
+    readme = _read("README.md")
+    runbook = _normalized("docs/RUNBOOK.md")
+    reproducibility = _normalized("REPRODUCIBILITY.md")
+    python_version = _read(".python-version").strip()
+    project = _read("pyproject.toml")
+
+    assert python_version == "3.11.9"
+    assert 'requires-python = ">=3.11,<3.12"' in project
+    assert "--python 3.11.9" in readme
+    assert "exact `environment`" in runbook
+    assert "revalidated immediately before final publication" in runbook
+    assert "direct-package versions" in reproducibility

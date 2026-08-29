@@ -66,8 +66,9 @@ must not be described as a deployable target-domain repair.
 
 Use `docs/RUNBOOK.md` to build into a fresh output directory. Exact byte-level
 reconstruction of all files, including provenance, requires the clean builder
-revision recorded in `provenance.json`; a later clean revision is expected to
-reproduce the four numerical CSV files while recording its own builder SHA in
-`provenance.json` and therefore a different detached checksum file. Raw data
-verification and official artifact availability remain local because
-`data/raw/` and `outputs/` are intentionally excluded from Git.
+revision and exact interpreter, platform, package versions, `.python-version`
+hash, and `uv.lock` hash recorded in `provenance.json`. A later clean revision
+or different environment must record its own provenance and may differ in
+last-bit floating-point serialization even when scientific values are
+equivalent. Raw data verification and official artifact availability remain
+local because `data/raw/` and `outputs/` are intentionally excluded from Git.

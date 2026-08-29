@@ -143,8 +143,20 @@ def _fixture_repository(tmp_path: Path) -> tuple[Path, Path]:
     return repository, _write_index(repository)
 
 
-def _allow_test_builder_sha(monkeypatch: pytest.MonkeyPatch) -> None:
+def _allow_test_builder_state(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(results, "_builder_sha", lambda _repository: "f" * 40)
+    monkeypatch.setattr(
+        results,
+        "_builder_environment",
+        lambda _repository: {
+            "python": "3.11.9",
+            "implementation": "CPython",
+            "platform": "test-platform",
+            "packages": {"calibrated-reliability": "0.1.0"},
+            "python_version_file": {"path": ".python-version", "sha256": "a" * 64},
+            "lockfile": {"path": "uv.lock", "sha256": "b" * 64},
+        },
+    )
 
 
 def test_index_requires_exactly_one_official_tree_per_experiment(tmp_path: Path) -> None:
@@ -224,6 +236,18 @@ def test_artifact_hash_mismatch_fails_closed(tmp_path: Path) -> None:
         results.verify_indexed_artifacts(repository, results.load_artifact_index(index_path))
 
 
+def test_malformed_manifest_artifact_hash_fails_closed(tmp_path: Path) -> None:
+    repository, index_path = _fixture_repository(tmp_path)
+    manifest_path = repository / "outputs" / "c01_official" / "run" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifacts"]["predictions.csv"] = "not-a-sha256"
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
+    _refresh_manifest_digest(index_path, "outputs/c01_official")
+
+    with pytest.raises(ValueError, match="64 lowercase hexadecimal"):
+        results.verify_indexed_artifacts(repository, results.load_artifact_index(index_path))
+
+
 def test_manifest_edit_fails_against_tracked_manifest_set_digest(tmp_path: Path) -> None:
     repository, index_path = _fixture_repository(tmp_path)
     manifest_path = repository / "outputs" / "c01_official" / "run" / "manifest.json"
@@ -232,6 +256,28 @@ def test_manifest_edit_fails_against_tracked_manifest_set_digest(tmp_path: Path)
     manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="Manifest-set hash mismatch"):
+        results.verify_indexed_artifacts(repository, results.load_artifact_index(index_path))
+
+
+def test_nested_manifest_fails_against_tracked_manifest_set_digest(tmp_path: Path) -> None:
+    repository, index_path = _fixture_repository(tmp_path)
+    nested = repository / "outputs" / "c01_official" / "run" / "nested" / "manifest.json"
+    nested.parent.mkdir()
+    nested.write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Manifest-set hash mismatch"):
+        results.verify_indexed_artifacts(repository, results.load_artifact_index(index_path))
+
+
+def test_nested_manifest_is_rejected_even_with_updated_trust_anchor(tmp_path: Path) -> None:
+    repository, index_path = _fixture_repository(tmp_path)
+    original = repository / "outputs" / "c01_official" / "run" / "manifest.json"
+    nested = original.parent / "nested" / "manifest.json"
+    nested.parent.mkdir()
+    original.replace(nested)
+    _refresh_manifest_digest(index_path, "outputs/c01_official")
+
+    with pytest.raises(ValueError, match="direct run child"):
         results.verify_indexed_artifacts(repository, results.load_artifact_index(index_path))
 
 
@@ -283,6 +329,41 @@ def test_manifest_experiment_id_mismatch_fails_closed(tmp_path: Path) -> None:
     _refresh_manifest_digest(index_path, "outputs/c01_official")
 
     with pytest.raises(ValueError, match="Experiment mismatch"):
+        results.verify_indexed_artifacts(repository, results.load_artifact_index(index_path))
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("target", "FD999", "Official run matrix mismatch"),
+        ("condition", {"id": "undeclared"}, "Official run matrix mismatch"),
+        ("source", "FD002", "source or evaluation unit"),
+        ("evaluation_unit", "cycle", "source or evaluation unit"),
+    ],
+)
+def test_official_run_identity_contract_fails_closed(
+    tmp_path: Path, field: str, value: Any, message: str
+) -> None:
+    repository, index_path = _fixture_repository(tmp_path)
+    manifest_path = repository / "outputs" / "c01_official" / "run" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest[field] = value
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
+    _refresh_manifest_digest(index_path, "outputs/c01_official")
+
+    with pytest.raises(ValueError, match=message):
+        results.verify_indexed_artifacts(repository, results.load_artifact_index(index_path))
+
+
+def test_absolute_manifest_artifact_path_fails_closed(tmp_path: Path) -> None:
+    repository, index_path = _fixture_repository(tmp_path)
+    manifest_path = repository / "outputs" / "c01_official" / "run" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifacts"]["C:\\outside.csv"] = "a" * 64
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
+    _refresh_manifest_digest(index_path, "outputs/c01_official")
+
+    with pytest.raises(ValueError, match="direct filenames"):
         results.verify_indexed_artifacts(repository, results.load_artifact_index(index_path))
 
 
@@ -349,7 +430,7 @@ def test_builder_is_deterministic_and_refuses_overwrite(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repository, index_path = _fixture_repository(tmp_path)
-    _allow_test_builder_sha(monkeypatch)
+    _allow_test_builder_state(monkeypatch)
 
     def point_rows(run: results.VerifiedRun, predictions: pd.DataFrame) -> list[dict[str, Any]]:
         return [
@@ -396,9 +477,9 @@ def test_failed_build_removes_temporary_directory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repository, index_path = _fixture_repository(tmp_path)
-    _allow_test_builder_sha(monkeypatch)
+    _allow_test_builder_state(monkeypatch)
     monkeypatch.setattr(results, "_point_rows", lambda _run, _predictions: [{"value": 1.0}])
-    monkeypatch.setattr(results, "_interval_rows", lambda _run, _predictions: [])
+    monkeypatch.setattr(results, "_interval_rows", lambda _run, _predictions: [{"value": 1.0}])
     monkeypatch.setattr(results, "_run_rows", lambda _runs: [{"run": "x"}])
     monkeypatch.setattr(results, "_summary_rows", lambda _point, _interval: [{"mean": 1.0}])
 
@@ -426,7 +507,7 @@ def test_tracked_gate_d_reports_match_their_provenance_hashes() -> None:
     report_root = ROOT / "reports" / "results"
     provenance = json.loads((report_root / "provenance.json").read_text(encoding="utf-8"))
 
-    assert provenance["schema_version"] == 2
+    assert provenance["schema_version"] in {2, 3}
     assert provenance["builder_git_clean"] is True
     assert len(provenance["builder_git_sha"]) == 40
     assert provenance["official_run_count"] == 105
@@ -437,6 +518,11 @@ def test_tracked_gate_d_reports_match_their_provenance_hashes() -> None:
     for line in checksums.splitlines():
         expected_hash, filename = line.split("  ", maxsplit=1)
         assert _hash(report_root / filename) == expected_hash
+    if provenance["schema_version"] == 3:
+        environment = provenance["environment"]
+        assert environment["python"] == "3.11.9"
+        assert environment["python_version_file"]["sha256"] == _hash(ROOT / ".python-version")
+        assert environment["lockfile"]["sha256"] == _hash(ROOT / "uv.lock")
 
 
 def test_public_builder_api_cannot_accept_spoofed_git_sha() -> None:
@@ -451,6 +537,98 @@ def test_builder_rejects_dirty_worktree(monkeypatch: pytest.MonkeyPatch, tmp_pat
 
     with pytest.raises(ValueError, match="clean Git worktree"):
         results._builder_sha(tmp_path)
+
+
+def test_builder_environment_is_frozen_and_complete() -> None:
+    environment = results._builder_environment(ROOT)
+
+    assert environment["python"] == (ROOT / ".python-version").read_text(encoding="utf-8").strip()
+    assert environment["implementation"] == "CPython"
+    assert environment["platform"]
+    assert set(environment["packages"]) == {
+        "calibrated-reliability",
+        "click",
+        "matplotlib",
+        "numpy",
+        "pandas",
+        "pyyaml",
+        "scikit-learn",
+        "scipy",
+    }
+    assert environment["python_version_file"]["sha256"] == _hash(ROOT / ".python-version")
+    assert environment["lockfile"]["sha256"] == _hash(ROOT / "uv.lock")
+
+
+def test_builder_environment_rejects_another_supported_python(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / ".python-version").write_text("3.11.9\n", encoding="utf-8")
+    (tmp_path / "uv.lock").write_text("locked\n", encoding="utf-8")
+    monkeypatch.setattr(results.platform, "python_version", lambda: "3.13.5")
+
+    with pytest.raises(ValueError, match="requires Python 3.11.9"):
+        results._builder_environment(tmp_path)
+
+
+def test_builder_revalidates_git_immediately_before_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, index_path = _fixture_repository(tmp_path)
+    _allow_test_builder_state(monkeypatch)
+    calls = 0
+
+    def git_state_changes(_repository: Path) -> str:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return "f" * 40
+        raise ValueError("Results builder requires a clean Git worktree")
+
+    monkeypatch.setattr(results, "_builder_sha", git_state_changes)
+    monkeypatch.setattr(results, "_point_rows", lambda _run, _predictions: [{"value": 1.0}])
+    monkeypatch.setattr(results, "_interval_rows", lambda _run, _predictions: [{"value": 1.0}])
+    monkeypatch.setattr(results, "_run_rows", lambda _runs: [{"run": "x"}])
+    monkeypatch.setattr(results, "_summary_rows", lambda _point, _interval: [{"mean": 1.0}])
+    destination = tmp_path / "dirty_during_build"
+
+    with pytest.raises(ValueError, match="clean Git worktree"):
+        results.build_results(repository, index_path, destination)
+
+    assert calls == 2
+    assert not destination.exists()
+    assert not list(tmp_path.glob(".dirty_during_build.*"))
+
+
+def test_builder_revalidates_artifacts_immediately_before_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, index_path = _fixture_repository(tmp_path)
+    _allow_test_builder_state(monkeypatch)
+    original_verify = results.verify_indexed_artifacts
+    calls = 0
+
+    def artifact_state_changes(
+        repository_root: Path, index: results.ArtifactIndex
+    ) -> tuple[results.VerifiedRun, ...]:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise ValueError("Artifact hash mismatch during final validation")
+        return original_verify(repository_root, index)
+
+    monkeypatch.setattr(results, "verify_indexed_artifacts", artifact_state_changes)
+    monkeypatch.setattr(results, "_point_rows", lambda _run, _predictions: [{"value": 1.0}])
+    monkeypatch.setattr(results, "_interval_rows", lambda _run, _predictions: [{"value": 1.0}])
+    monkeypatch.setattr(results, "_run_rows", lambda _runs: [{"run": "x"}])
+    monkeypatch.setattr(results, "_summary_rows", lambda _point, _interval: [{"mean": 1.0}])
+    destination = tmp_path / "changed_artifacts"
+
+    with pytest.raises(ValueError, match="Artifact hash mismatch"):
+        results.build_results(repository, index_path, destination)
+
+    assert calls == 2
+    assert not destination.exists()
+    assert not list(tmp_path.glob(".changed_artifacts.*"))
 
 
 def test_tracked_tables_preserve_pending_and_rank_semantics() -> None:

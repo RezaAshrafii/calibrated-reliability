@@ -109,4 +109,7 @@ reject dirty worktrees and must not overwrite an existing run directory. No
 number is allowed into a report or paper unless the tracked Gate D builder has
 reconstructed it from an indexed verified artifact. ACI is an adaptive/online
 calibration method, not a batch method. Negative, null, and inconvenient results
-must be retained.
+must be retained. Gate D report publication additionally requires the tracked
+Python 3.11.9 interpreter and records the platform, direct runtime package
+versions, `.python-version` hash, and `uv.lock` hash. Git state, environment,
+and official artifacts are revalidated immediately before atomic publication.

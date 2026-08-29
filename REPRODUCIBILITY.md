@@ -24,8 +24,9 @@ for reporting.
 
 ## Reproduction contract
 
-1. Install Python 3.11+ and `uv`.
-2. Run `uv sync --locked --extra dev`.
+1. Install the exact Python version in `.python-version` (currently 3.11.9)
+   and `uv`.
+2. Run `uv sync --locked --python 3.11.9 --extra dev`.
 3. Place officially sourced C-MAPSS files under `data/raw/`; never commit them.
 4. Verify registered files with `uv run python scripts/verify_data.py
    --registry data/registry.yaml --data-root data/raw`.
@@ -42,9 +43,11 @@ for reporting.
 11. Treat the tracked manifest-set digests and exact official run contracts in
     `docs/artifact_index.yaml` as the Gate D artifact-identity trust anchor.
 12. For byte-identical report reconstruction, use the clean builder revision
-    recorded in `provenance.json` and verify `checksums.sha256`. A later builder
-    revision must identify itself and therefore changes provenance even when all
-    numerical CSV bytes are unchanged.
+    and exact Python, platform, direct-package versions, `.python-version` hash,
+    and `uv.lock` hash recorded in `provenance.json`, then verify
+    `checksums.sha256`. A later builder revision or different environment must
+    identify itself and therefore changes provenance even when numerical CSV
+    values are scientifically equivalent.
 
 Raw data and generated outputs are intentionally excluded from Git. Their
 absence from a clean clone means local data and artifact verification is not a
