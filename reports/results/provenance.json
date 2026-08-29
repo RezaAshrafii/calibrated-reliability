@@ -2,10 +2,12 @@
   "artifact_index": {
     "index_id": "c01_c08_gate_d",
     "path": "docs/artifact_index.yaml",
-    "sha256": "16c2eec89741f4a6cecf9b3ab2524a9a95ad8025c3a4e0b4d7b7523a311e7325"
+    "sha256": "4a9b6bbc9fd2c11783ea7daa3ef97d3914603c8d0b1dd514dab5c8d70f3b5bbe"
   },
-  "builder_git_sha": "4a5c9cfee44c280424f3be3a22313c8b14a353c2",
+  "builder_git_clean": true,
+  "builder_git_sha": "e9d1361f562e53095e637cb92e9d08b63223c261",
   "csv_float_parser": "pandas.read_csv(float_precision=\"round_trip\")",
+  "detached_checksum_file": "checksums.sha256",
   "mixed_sha_policy": {
     "mode": "allow_across_experiments_only",
     "provenance_field": "source_git_shas",
@@ -29,7 +31,7 @@
     "point_metrics_by_seed.csv": "51753ed6ddb07737c03a8dc0e50beb3c2ef978d2a78962a4019b1325233e53bf",
     "summary.csv": "67df7aff8296b2685d7a76f29b3fae1ec57d479bef953ec4d37d3b3153ead315"
   },
-  "schema_version": 1,
+  "schema_version": 2,
   "source_git_shas": [
     "0cfbe6357863e5bffcf4b3223823d1323fd86b0a",
     "2be1b54b55316be988cc9a21c5c6acf6294882a5",
