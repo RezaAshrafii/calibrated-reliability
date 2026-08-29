@@ -45,7 +45,8 @@ def test_future_experiments_remain_blocked_and_oracle_labeled() -> None:
     protocol = _normalized("docs/protocol.md")
     results = _read("docs/RESULTS.md")
 
-    assert "Independent C11-A review is required before execution" in protocol
+    assert "Independent C11-A review is required before config or production" in protocol
+    assert "implementation-readiness review is required before execution" in protocol
     oracle_label = "ORACLE / DIAGNOSTIC - NOT A DEPLOYMENT METHOD"
     assert oracle_label in protocol
     assert "| C11 | NOT IMPLEMENTED | NOT EXECUTED |" in results
@@ -136,3 +137,30 @@ def test_gate_d_environment_is_exact_and_revalidated() -> None:
     assert "exact `environment`" in runbook
     assert "revalidated immediately before final publication" in runbook
     assert "direct-package versions" in reproducibility
+
+
+def test_c11_proposed_design_is_exact_and_execution_remains_blocked() -> None:
+    adr = _normalized("docs/decisions/ADR-0012-c11-finite-reservoir-design.md")
+    readme = _normalized("README.md")
+    protocol = _normalized("docs/protocol.md")
+    registry = _normalized("docs/experiment_registry.md")
+    runbook = _read("docs/RUNBOOK.md")
+
+    assert "Proposed -- design only" in adr
+    assert "FD001-to-FD001 mechanism audit" in adr
+    assert "the 60 FD001 base-training engines" in adr
+    assert "the remaining 40 FD001 training engines" in adr
+    assert "The primary analysis does not simulate this variable" in adr
+    assert "It integrates it exactly" in adr
+    assert "P(K=k) = C(k-1, r-1) * C(N-k, n-r) / C(N, n)" in adr
+    assert "Beta(r, n_cal + 1 - r)" in adr
+    assert "Beta-binomial projection" in adr
+    assert "not_evaluated_due_to_unattainable_finite_rank" in adr
+    assert "does not yet authorize implementation or execution" in adr
+    assert "independent C11-A review" in readme
+    assert "Independent C11-A review is required before config" in protocol
+    assert "C11 is not yet an experiment-registry entry" in registry
+    assert "run_c11" not in runbook
+    assert not (ROOT / "configs" / "cmapss" / "c11.yaml").exists()
+    assert not (ROOT / "src" / "calibrated_reliability" / "experiments" / "c11.py").exists()
+    assert not (ROOT / "scripts" / "run_c11.py").exists()

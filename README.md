@@ -15,14 +15,15 @@ distribution shift using turbofan remaining-useful-life (RUL) prediction.
 provide replication/context (C01--C04) and exploratory/appendix evidence
 (C05--C08); they are not presented as new conformal methods.
 
-**Current gate:** independent review of the completed Gate D reporting system
-before any C11 design. Gate N returned `REFRAME`: the surviving scientific scope is a narrow
+**Current gate:** independent C11-A review of the proposed design in ADR-0012.
+Gate D passed independent review; no C11 implementation or execution is yet
+authorized. Gate N returned `REFRAME`: the surviving scientific scope is a narrow
 application-level audit of engine-level conformal rank attainability and
 resolution, compared with the exact Beta reference and interpreted alongside
 the C-MAPSS observation mechanism.
 
-**Not implemented:** C11 and C12. C11 requires a dedicated design ADR and
-independent review before execution. C12 is optional, oracle-only supporting
+**Not implemented:** C11 and C12. C11 now has a proposed design ADR that must
+pass independent review before implementation. C12 is optional, oracle-only supporting
 diagnostics and cannot precede C11. MALT, C12-D, N-CMAPSS expansion, new deep
 models, and dashboard work are deferred outside the current core study.
 

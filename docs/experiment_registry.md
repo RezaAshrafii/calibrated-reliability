@@ -25,10 +25,11 @@ deterministic builder. This status does not extend to C11 or C12.
 
 ## Candidate future work
 
-- C11 is not yet an experiment-registry entry. Gate N permits only design work
-  for a narrow engine-level rank-attainability/resolution audit. A dedicated ADR,
-  frozen configuration, tests, and independent C11-A review are required before
-  execution.
+- C11 is not yet an experiment-registry entry. Proposed ADR-0012 specifies the
+  narrow FD001 engine-level finite-reservoir rank-attainability/resolution audit.
+  It must pass independent C11-A design review before configuration or production
+  implementation; implementation tests and a separate readiness review are
+  required before execution.
 - C12 is optional and secondary. If retained after C11, only Conditions A/B may
   be designed, with an explicit `ORACLE / DIAGNOSTIC - NOT A DEPLOYMENT METHOD`
   label, disjoint target calibration/evaluation, observation-policy controls,

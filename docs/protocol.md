@@ -86,11 +86,16 @@ indexed verified artifacts.
 
 ## Future design gates
 
-C11 is not implemented and must not run before a dedicated ADR freezes its
-engine reservoir, predictor, calibration sizes, attainable alpha/size cells,
-cut points, exact-enumeration estimand, Beta references, finite-reservoir
-interpretation, artifacts, and tests. Independent C11-A review is required
-before execution.
+C11 is not implemented. Proposed ADR-0012 freezes an FD001-only design with one
+seed-13 HGB predictor, a disjoint 60-engine fit role and 40-engine finite
+reservoir, fixed per-engine cut points, exact combinatorial subset integration,
+six attainable size/alpha cells, continuous Beta and finite-evaluation
+beta-binomial references, observation-mechanism diagnostics, artifacts, tests,
+and null-result stop rules. It replaces Monte Carlo calibration draws with an
+exact conditional finite-reservoir distribution and treats deviation from the
+reference--not raw draw variance--as the scientific quantity. Independent C11-A
+review is required before config or production implementation; a separate
+implementation-readiness review is required before execution.
 
 C12 is optional and must not precede the reviewed C11 mechanism result. If
 retained, only Conditions A/B may be designed. Target calibration and evaluation
