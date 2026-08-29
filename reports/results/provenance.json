@@ -5,9 +5,32 @@
     "sha256": "4a9b6bbc9fd2c11783ea7daa3ef97d3914603c8d0b1dd514dab5c8d70f3b5bbe"
   },
   "builder_git_clean": true,
-  "builder_git_sha": "e9d1361f562e53095e637cb92e9d08b63223c261",
+  "builder_git_sha": "59e0549f4466cd773092d355f6e06225b067021d",
   "csv_float_parser": "pandas.read_csv(float_precision=\"round_trip\")",
   "detached_checksum_file": "checksums.sha256",
+  "environment": {
+    "implementation": "CPython",
+    "lockfile": {
+      "path": "uv.lock",
+      "sha256": "f33e2f593cdcf7e7647db7befe99e30843e1688285377a2fe237f024db5c1508"
+    },
+    "packages": {
+      "calibrated-reliability": "0.1.0",
+      "click": "8.4.2",
+      "matplotlib": "3.11.1",
+      "numpy": "2.4.6",
+      "pandas": "3.0.5",
+      "pyyaml": "6.0.3",
+      "scikit-learn": "1.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-10-10.0.26200-SP0",
+    "python": "3.11.9",
+    "python_version_file": {
+      "path": ".python-version",
+      "sha256": "61141e9590171b900fdf709e7ea8f050d5c2a69198d4a4a1977d7c45186307e5"
+    }
+  },
   "mixed_sha_policy": {
     "mode": "allow_across_experiments_only",
     "provenance_field": "source_git_shas",
@@ -31,7 +54,7 @@
     "point_metrics_by_seed.csv": "51753ed6ddb07737c03a8dc0e50beb3c2ef978d2a78962a4019b1325233e53bf",
     "summary.csv": "67df7aff8296b2685d7a76f29b3fae1ec57d479bef953ec4d37d3b3153ead315"
   },
-  "schema_version": 2,
+  "schema_version": 3,
   "source_git_shas": [
     "0cfbe6357863e5bffcf4b3223823d1323fd86b0a",
     "2be1b54b55316be988cc9a21c5c6acf6294882a5",

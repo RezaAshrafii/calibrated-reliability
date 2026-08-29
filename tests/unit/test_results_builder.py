@@ -507,7 +507,7 @@ def test_tracked_gate_d_reports_match_their_provenance_hashes() -> None:
     report_root = ROOT / "reports" / "results"
     provenance = json.loads((report_root / "provenance.json").read_text(encoding="utf-8"))
 
-    assert provenance["schema_version"] in {2, 3}
+    assert provenance["schema_version"] == 3
     assert provenance["builder_git_clean"] is True
     assert len(provenance["builder_git_sha"]) == 40
     assert provenance["official_run_count"] == 105
@@ -518,11 +518,10 @@ def test_tracked_gate_d_reports_match_their_provenance_hashes() -> None:
     for line in checksums.splitlines():
         expected_hash, filename = line.split("  ", maxsplit=1)
         assert _hash(report_root / filename) == expected_hash
-    if provenance["schema_version"] == 3:
-        environment = provenance["environment"]
-        assert environment["python"] == "3.11.9"
-        assert environment["python_version_file"]["sha256"] == _hash(ROOT / ".python-version")
-        assert environment["lockfile"]["sha256"] == _hash(ROOT / "uv.lock")
+    environment = provenance["environment"]
+    assert environment["python"] == "3.11.9"
+    assert environment["python_version_file"]["sha256"] == _hash(ROOT / ".python-version")
+    assert environment["lockfile"]["sha256"] == _hash(ROOT / "uv.lock")
 
 
 def test_public_builder_api_cannot_accept_spoofed_git_sha() -> None:
