@@ -278,6 +278,12 @@ seeds, changed cut policy, changed cap, unsupported cells, numeric strings,
 booleans, NaN, infinity, duplicate cells, and any unattainable cell marked for
 evaluation.
 
+The public C11 statistical primitives apply the same fail-closed boundary:
+numeric strings and Boolean values are rejected before numerical conversion.
+The artifact writer independently parses the tracked configuration and registry
+and requires the supplied configuration and three-file FD001 provenance to
+match those tracked inputs exactly.
+
 The configuration must distinguish `predictor_seed`, `split_seed`, and
 `cut_point_seed` even though all are frozen to 13. It must contain no
 calibration-resample count because exact enumeration is primary. Any optional

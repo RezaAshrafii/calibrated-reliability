@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from calibrated_reliability.data.registry import compute_sha256
+from calibrated_reliability.data.registry import compute_sha256, load_registry
 from calibrated_reliability.experiments.c01 import C01Config, C01Result
 from calibrated_reliability.experiments.c02 import C02Config, C02Result
 from calibrated_reliability.experiments.c03 import C03Config, C03Result
@@ -89,6 +89,32 @@ def _validate_c11_publication_state(sha: str, tracked_inputs: dict[Path, str]) -
             raise RuntimeError(
                 f"C11 provenance input changed during artifact construction: {path}"
             )
+
+
+def _validate_c11_provenance_contract(
+    config: C11Config,
+    config_path: Path,
+    registry_path: Path,
+    data_provenance: dict[str, dict[str, Any]],
+) -> None:
+    """Require writer inputs to match the strict config and tracked data registry."""
+    file_config = C11Config.from_yaml(config_path.read_text(encoding="utf-8"))
+    if file_config.as_dict() != config.as_dict():
+        raise ValueError("C11 configuration object does not match the configuration file")
+    records = {record.filename: record for record in load_registry(registry_path)}
+    names = {"train_FD001.txt", "test_FD001.txt", "RUL_FD001.txt"}
+    if set(data_provenance) != names or not names.issubset(records):
+        raise ValueError("C11 data provenance must contain exactly the three FD001 inputs")
+    for name in sorted(names):
+        record = records[name]
+        expected = {
+            "sha256": record.sha256,
+            "bytes": record.expected_bytes,
+            "rows": record.expected_rows,
+            "engines": record.expected_engines,
+        }
+        if data_provenance[name] != expected:
+            raise ValueError(f"C11 data provenance does not match the registry for {name}")
 
 
 def write_c01_run(
@@ -735,6 +761,7 @@ def write_c11_run(
     config.validate()
     if re.fullmatch(r"[0-9a-f]{40}", sha) is None:
         raise ValueError("C11 Git SHA must be 40 lowercase hexadecimal characters")
+    _validate_c11_provenance_contract(config, config_path, registry_path, data_provenance)
     adr_path = _repository_root() / C11_ADR_PATH
     lock_path = _repository_root() / "uv.lock"
     tracked_inputs = {

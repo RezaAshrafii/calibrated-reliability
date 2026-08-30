@@ -225,10 +225,16 @@ class C11Result:
     cut_points: dict[int, int]
 
 
+def _is_strict_numeric(value: Any) -> bool:
+    return isinstance(value, (int, float, np.integer, np.floating)) and not isinstance(
+        value, (bool, np.bool_)
+    )
+
+
 def _numeric_scores(values: Any, name: str) -> np.ndarray:
     raw = pd.Series(values)
-    if raw.map(lambda value: isinstance(value, (bool, np.bool_))).any():
-        raise ValueError(f"{name} must not contain boolean values")
+    if not raw.map(_is_strict_numeric).all():
+        raise ValueError(f"{name} must contain strict numeric values, not strings or booleans")
     scores = np.asarray(pd.to_numeric(raw, errors="raise").to_numpy(dtype="float64"))
     if len(scores) == 0 or not np.isfinite(scores).all() or (scores < 0).any():
         raise ValueError(f"{name} must be non-empty, finite, and nonnegative")
@@ -335,10 +341,12 @@ def _weighted_distribution(values: Any, probabilities: Any) -> tuple[np.ndarray,
     raw_values = pd.Series(values)
     raw_probabilities = pd.Series(probabilities)
     if (
-        raw_values.map(lambda value: isinstance(value, (bool, np.bool_))).any()
-        or raw_probabilities.map(lambda value: isinstance(value, (bool, np.bool_))).any()
+        not raw_values.map(_is_strict_numeric).all()
+        or not raw_probabilities.map(_is_strict_numeric).all()
     ):
-        raise ValueError("weighted distribution must not contain boolean values")
+        raise ValueError(
+            "weighted distribution must contain strict numeric values, not strings or booleans"
+        )
     frame = pd.DataFrame(
         {
             "value": pd.to_numeric(raw_values, errors="raise"),

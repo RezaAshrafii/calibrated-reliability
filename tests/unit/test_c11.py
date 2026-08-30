@@ -17,6 +17,7 @@ import pandas as pd
 import pytest
 import yaml
 from click.testing import CliRunner
+from scipy.integrate import quad
 from scipy.special import beta as beta_function
 from scipy.stats import beta as beta_distribution
 from scipy.stats import wasserstein_distance
@@ -108,12 +109,22 @@ def test_c11_configuration_revalidation_rejects_manual_payload_drift() -> None:
         lambda: exact_order_statistic_distribution([False, True, 2.0], 2, 0.50),
         lambda: weighted_ks_distance([True], [1.0], [0.5], [1.0]),
         lambda: weighted_ks_distance([0.5], [True], [0.5], [1.0]),
+        lambda: exact_order_statistic_distribution([np.bool_(True), 1.0, 2.0], 2, 0.50),
+        lambda: weighted_ks_distance([np.bool_(True)], [1.0], [0.5], [1.0]),
+        lambda: weighted_ks_distance([0.5], [np.bool_(True)], [0.5], [1.0]),
         lambda: weighted_ks_distance([0.5], [1.0], beta_parameters=(True, 2)),
         lambda: distribution_discrepancies([0.5], [1.0], 0.10, beta_parameters=(2, False)),
+        lambda: exact_order_statistic_distribution(["1.0", "2.0", "3.0"], 2, 0.50),
+        lambda: weighted_ks_distance(["0.5"], [1.0], [0.5], [1.0]),
+        lambda: weighted_ks_distance([0.5], ["1.0"], [0.5], [1.0]),
+        lambda: weighted_ks_distance([0.5], [1.0], ["0.5"], [1.0]),
+        lambda: weighted_ks_distance([0.5], [1.0], [0.5], ["1.0"]),
     ],
 )
-def test_c11_mathematical_apis_reject_boolean_inputs(operation: Callable[[], object]) -> None:
-    with pytest.raises(ValueError, match="boolean|positive integers"):
+def test_c11_mathematical_apis_reject_non_strict_numeric_inputs(
+    operation: Callable[[], object],
+) -> None:
+    with pytest.raises(ValueError, match="strict numeric|positive integers"):
         operation()
 
 
@@ -503,8 +514,24 @@ def _write_inputs(tmp_path: Path) -> tuple[Path, Path]:
     config_path = tmp_path / "finite_reservoir.yaml"
     config_path.write_text(_config_text(), encoding="utf-8")
     registry_path = tmp_path / "registry.yaml"
-    registry_path.write_text("version: 1\nfiles: []\n", encoding="utf-8")
+    registry_path.write_text(
+        Path("data/registry.yaml").read_text(encoding="utf-8"), encoding="utf-8"
+    )
     return config_path, registry_path
+
+
+def _data_provenance() -> dict[str, dict[str, object]]:
+    payload = yaml.safe_load(Path("data/registry.yaml").read_text(encoding="utf-8"))
+    records = {record["filename"]: record for record in payload["files"]}
+    return {
+        name: {
+            "sha256": records[name]["sha256"],
+            "bytes": records[name]["expected_bytes"],
+            "rows": records[name]["expected_rows"],
+            "engines": records[name]["expected_engines"],
+        }
+        for name in ("train_FD001.txt", "test_FD001.txt", "RUL_FD001.txt")
+    }
 
 
 def test_c11_artifact_is_complete_hashed_and_immutable(
@@ -516,7 +543,10 @@ def test_c11_artifact_is_complete_hashed_and_immutable(
     config_path, registry_path = _write_inputs(tmp_path)
     output = tmp_path / "outputs"
     monkeypatch.setattr(artifacts_module, "_validate_c11_publication_state", lambda *args: None)
-    run_dir = write_c11_run(output, "a" * 40, config, result, config_path, registry_path, {})
+    provenance = _data_provenance()
+    run_dir = write_c11_run(
+        output, "a" * 40, config, result, config_path, registry_path, provenance
+    )
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["experiment_id"] == "C11"
     assert manifest["accepted_design_adr"]["path"].endswith(
@@ -539,7 +569,7 @@ def test_c11_artifact_is_complete_hashed_and_immutable(
     for name, expected_hash in manifest["artifacts"].items():
         assert hashlib.sha256((run_dir / name).read_bytes()).hexdigest() == expected_hash
     with pytest.raises(FileExistsError):
-        write_c11_run(output, "a" * 40, config, result, config_path, registry_path, {})
+        write_c11_run(output, "a" * 40, config, result, config_path, registry_path, provenance)
 
 
 def test_c11_failed_artifact_write_cleans_temporary_directory(
@@ -560,7 +590,15 @@ def test_c11_failed_artifact_write_cleans_temporary_directory(
     monkeypatch.setattr(artifacts_module, "_write_bytes", fail)
     output = tmp_path / "outputs"
     with pytest.raises(OSError, match="simulated C11 failure"):
-        write_c11_run(output, "a" * 40, config, result, config_path, registry_path, {})
+        write_c11_run(
+            output,
+            "a" * 40,
+            config,
+            result,
+            config_path,
+            registry_path,
+            _data_provenance(),
+        )
     assert list(output.iterdir()) == []
 
 
@@ -582,7 +620,15 @@ def test_c11_final_publication_revalidation_failure_cleans_temporary_directory(
     monkeypatch.setattr(artifacts_module, "_validate_c11_publication_state", reject_final)
     output = tmp_path / "outputs"
     with pytest.raises(RuntimeError, match="final provenance"):
-        write_c11_run(output, "a" * 40, config, result, config_path, registry_path, {})
+        write_c11_run(
+            output,
+            "a" * 40,
+            config,
+            result,
+            config_path,
+            registry_path,
+            _data_provenance(),
+        )
     assert calls == 2
     assert list(output.iterdir()) == []
 
@@ -615,6 +661,56 @@ def test_c11_publication_state_checks_sha_cleanliness_and_input_hashes(
         artifacts_module._validate_c11_publication_state("a" * 40, {tracked: expected_hash})
 
 
+def test_c11_writer_rejects_config_and_data_provenance_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    synthetic_c11: tuple[C11Config, C11Result, pd.DataFrame],
+) -> None:
+    config, result, _ = synthetic_c11
+    config_path, registry_path = _write_inputs(tmp_path)
+    monkeypatch.setattr(artifacts_module, "_validate_c11_publication_state", lambda *args: None)
+    drifted = yaml.safe_load(_config_text())
+    drifted["predictor_seed"] = 37
+    config_path.write_text(yaml.safe_dump(drifted, sort_keys=False), encoding="utf-8")
+    with pytest.raises(ValueError, match="frozen C11 design"):
+        write_c11_run(
+            tmp_path / "config-mismatch",
+            "a" * 40,
+            config,
+            result,
+            config_path,
+            registry_path,
+            _data_provenance(),
+        )
+
+    config_path.write_text(_config_text(), encoding="utf-8")
+    bad_provenance = _data_provenance()
+    bad_provenance["train_FD001.txt"]["rows"] = 1
+    with pytest.raises(ValueError, match="does not match the registry"):
+        write_c11_run(
+            tmp_path / "data-mismatch",
+            "a" * 40,
+            config,
+            result,
+            config_path,
+            registry_path,
+            bad_provenance,
+        )
+
+    incomplete = _data_provenance()
+    del incomplete["RUL_FD001.txt"]
+    with pytest.raises(ValueError, match="exactly the three FD001 inputs"):
+        write_c11_run(
+            tmp_path / "missing-data",
+            "a" * 40,
+            config,
+            result,
+            config_path,
+            registry_path,
+            incomplete,
+        )
+
+
 def test_c11_result_tables_reconstruct_distributions(
     synthetic_c11: tuple[C11Config, C11Result, pd.DataFrame],
 ) -> None:
@@ -641,6 +737,111 @@ def test_c11_result_tables_reconstruct_distributions(
     ).all()
 
 
+def _manual_grouped_distribution(
+    values: pd.Series, probabilities: pd.Series
+) -> tuple[np.ndarray, np.ndarray]:
+    frame = pd.DataFrame(
+        {
+            "value": values.to_numpy(dtype="float64"),
+            "probability": probabilities.to_numpy(dtype="float64"),
+        }
+    )
+    grouped = frame.groupby("value", sort=True, as_index=False)["probability"].sum()
+    return (
+        grouped["value"].to_numpy(dtype="float64"),
+        grouped["probability"].to_numpy(dtype="float64"),
+    )
+
+
+def _manual_cdf(
+    point: float, values: np.ndarray, probabilities: np.ndarray, *, left: bool
+) -> float:
+    mask = values < point if left else values <= point
+    return float(probabilities[mask].sum())
+
+
+def _manual_serialized_discrepancies(
+    finite_values: pd.Series,
+    finite_probabilities: pd.Series,
+    alpha: float,
+    *,
+    beta_parameters: tuple[int, int] | None = None,
+    reference_values: pd.Series | None = None,
+    reference_probabilities: pd.Series | None = None,
+) -> dict[str, float]:
+    values, probabilities = _manual_grouped_distribution(finite_values, finite_probabilities)
+    threshold = (1.0 - alpha) - 0.10
+    finite_mean = float(np.dot(values, probabilities))
+    finite_sd = float(np.sqrt(np.dot(np.square(values - finite_mean), probabilities)))
+    finite_tail = float(probabilities[values < threshold].sum())
+    if beta_parameters is not None:
+        a, b = beta_parameters
+        reference_mean = float(beta_distribution.mean(a, b))
+        reference_sd = float(beta_distribution.std(a, b))
+        reference_tail = float(beta_distribution.cdf(threshold, a, b))
+        ks = max(
+            abs(
+                _manual_cdf(point, values, probabilities, left=left)
+                - float(beta_distribution.cdf(point, a, b))
+            )
+            for point in values
+            for left in (True, False)
+        )
+
+        def integrand(point: float) -> float:
+            return abs(
+                _manual_cdf(point, values, probabilities, left=False)
+                - float(beta_distribution.cdf(point, a, b))
+            )
+
+        w1 = float(
+            quad(
+                integrand,
+                0.0,
+                1.0,
+                points=values[(values > 0.0) & (values < 1.0)].tolist(),
+                epsabs=1.0e-12,
+                epsrel=1.0e-12,
+                limit=500,
+            )[0]
+        )
+    else:
+        assert reference_values is not None and reference_probabilities is not None
+        ref_values, ref_probabilities = _manual_grouped_distribution(
+            reference_values, reference_probabilities
+        )
+        reference_mean = float(np.dot(ref_values, ref_probabilities))
+        reference_sd = float(
+            np.sqrt(np.dot(np.square(ref_values - reference_mean), ref_probabilities))
+        )
+        reference_tail = float(ref_probabilities[ref_values < threshold].sum())
+        jump_points = np.union1d(values, ref_values)
+        ks = max(
+            abs(
+                _manual_cdf(point, values, probabilities, left=left)
+                - _manual_cdf(point, ref_values, ref_probabilities, left=left)
+            )
+            for point in jump_points
+            for left in (True, False)
+        )
+        integration_points = np.union1d([0.0, 1.0], jump_points)
+        w1 = sum(
+            (right - left)
+            * abs(
+                _manual_cdf(left, values, probabilities, left=False)
+                - _manual_cdf(left, ref_values, ref_probabilities, left=False)
+            )
+            for left, right in zip(integration_points[:-1], integration_points[1:], strict=True)
+        )
+    return {
+        "ks_distance": float(ks),
+        "signed_mean_difference": finite_mean - reference_mean,
+        "signed_severe_tail_difference": finite_tail - reference_tail,
+        "signed_population_sd_difference": finite_sd - reference_sd,
+        "wasserstein_1": float(w1),
+    }
+
+
 def test_c11_serialized_tables_independently_reconstruct_metrics_and_discrepancies(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -650,7 +851,13 @@ def test_c11_serialized_tables_independently_reconstruct_metrics_and_discrepanci
     config_path, registry_path = _write_inputs(tmp_path)
     monkeypatch.setattr(artifacts_module, "_validate_c11_publication_state", lambda *args: None)
     run_dir = write_c11_run(
-        tmp_path / "outputs", "a" * 40, config, result, config_path, registry_path, {}
+        tmp_path / "outputs",
+        "a" * 40,
+        config,
+        result,
+        config_path,
+        registry_path,
+        _data_provenance(),
     )
     quantiles = pd.read_csv(run_dir / "quantile_distribution.csv", float_precision="round_trip")
     evaluation = pd.read_csv(run_dir / "evaluation_scores.csv", float_precision="round_trip")
@@ -679,7 +886,7 @@ def test_c11_serialized_tables_independently_reconstruct_metrics_and_discrepanci
                 "reference_values": reference["coverage"],
                 "reference_probabilities": reference["probability"],
             }
-        rebuilt = distribution_discrepancies(
+        rebuilt = _manual_serialized_discrepancies(
             finite["coverage"], finite["probability"], row.alpha, **kwargs
         )
         for name, value in rebuilt.items():
@@ -739,3 +946,79 @@ def test_c11_runner_validates_inputs_twice_and_calls_run_and_write_once(
     assert len(run_calls) == 1
     assert len(write_calls) == 1
     assert sorted(validation_calls) == sorted([record.filename for record in records] * 2)
+
+
+@pytest.mark.parametrize(
+    "changed_input",
+    [
+        "config",
+        "registry",
+        "train_FD001.txt",
+        "test_FD001.txt",
+        "RUL_FD001.txt",
+    ],
+)
+def test_c11_runner_rejects_input_changes_after_computation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed_input: str
+) -> None:
+    config_path, registry_path = _write_inputs(tmp_path)
+    records = [
+        SimpleNamespace(
+            filename=name,
+            sha256="0" * 64,
+            expected_bytes=1,
+            expected_rows=1,
+            expected_engines=1,
+        )
+        for name in ("train_FD001.txt", "test_FD001.txt", "RUL_FD001.txt")
+    ]
+    validation_count = 0
+
+    def validate(root: Path, record: SimpleNamespace) -> SimpleNamespace:
+        nonlocal validation_count
+        validation_count += 1
+        changed = (
+            validation_count > len(records)
+            and changed_input not in {"config", "registry"}
+            and record.filename == changed_input
+        )
+        return SimpleNamespace(valid=not changed)
+
+    monkeypatch.setattr(runner_module, "load_registry", lambda path: records)
+    monkeypatch.setattr(runner_module, "validate_file", validate)
+    sentinel_frame = pd.DataFrame()
+    monkeypatch.setattr(runner_module, "load_train", lambda path: sentinel_frame)
+    monkeypatch.setattr(runner_module, "load_test", lambda path: sentinel_frame)
+    monkeypatch.setattr(runner_module, "load_rul", lambda path: sentinel_frame)
+
+    def mutate_after_computation(*args: object) -> object:
+        if changed_input == "config":
+            config_path.write_text(_config_text() + "\n", encoding="utf-8")
+        elif changed_input == "registry":
+            registry_path.write_text(
+                registry_path.read_text(encoding="utf-8") + "\n", encoding="utf-8"
+            )
+        return object()
+
+    monkeypatch.setattr(runner_module, "run_c11", mutate_after_computation)
+    write_calls: list[object] = []
+    monkeypatch.setattr(
+        runner_module,
+        "write_c11_run",
+        lambda *args: write_calls.append(args) or (tmp_path / "published"),
+    )
+    monkeypatch.setattr(
+        runner_module.subprocess,
+        "check_output",
+        lambda command, **kwargs: "a" * 40 + "\n" if "rev-parse" in command else "",
+    )
+    outcome = CliRunner().invoke(
+        runner_module.main,
+        ["--config", str(config_path), "--registry", str(registry_path)],
+    )
+    assert outcome.exit_code != 0
+    assert write_calls == []
+    if changed_input not in {"config", "registry"}:
+        assert "data changed during execution" in outcome.output
+    else:
+        assert "configuration or registry changed during execution" in outcome.output
