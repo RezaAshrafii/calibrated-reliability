@@ -27,7 +27,7 @@ def test_environment_records_every_declared_direct_runtime_dependency() -> None:
 
 def test_every_artifact_writer_uses_the_uniform_publish_guard() -> None:
     """Every experiment writer rechecks immutability at final publication."""
-    for experiment in range(1, 9):
+    for experiment in (*range(1, 9), 11):
         writer = getattr(artifacts, f"write_c{experiment:02d}_run")
         assert "_publish_directory(temporary_dir, run_dir)" in inspect.getsource(writer)
 

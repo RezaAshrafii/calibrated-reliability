@@ -23,15 +23,18 @@ tracked Gate D results builder; it cannot be inferred from local output files.
 Every C01--C08 row is `REPORTED` through the tracked Gate D artifact index and
 deterministic builder. This status does not extend to C11 or C12.
 
+## Implemented future experiment awaiting execution review
+
+| ID | Role | Method | Source -> target | Unit | Alpha | Seed | Config | Lifecycle | Reporting class |
+|---|---|---|---|---|---|---|---|---|---|
+| C11 | candidate RQ2 mechanism | Exact finite-reservoir conformal audit | FD001 -> FD001 | engine endpoint finite reservoir | .10,.05 | 13 | `configs/cmapss/finite_reservoir.yaml` | IMPLEMENTED / NOT EXECUTED / NOT VERIFIED / NOT REPORTED | candidate primary mechanism audit |
+
+C11-A accepted the narrow, retrospectively motivated and prospectively frozen
+descriptive design. The implementation-readiness review must pass before the
+runner may execute or publish an official artifact.
+
 ## Candidate future work
 
-- C11 is not yet an experiment-registry entry. Proposed ADR-0012 specifies the
-  narrow FD001 engine-level finite-reservoir rank-attainability/resolution audit.
-  It is retrospectively motivated and prospectively frozen as a descriptive
-  audit, not confirmatory preregistration.
-  It must pass independent C11-A design review before configuration or production
-  implementation; implementation tests and a separate readiness review are
-  required before execution.
 - C12 is optional and secondary. If retained after C11, only Conditions A/B may
   be designed, with an explicit `ORACLE / DIAGNOSTIC - NOT A DEPLOYMENT METHOD`
   label, disjoint target calibration/evaluation, observation-policy controls,

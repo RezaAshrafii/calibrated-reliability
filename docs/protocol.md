@@ -86,8 +86,10 @@ indexed verified artifacts.
 
 ## Future design gates
 
-C11 is not implemented. Proposed ADR-0012 freezes an FD001-only design with one
-seed-13 HGB predictor, a disjoint 60-engine fit role and 40-engine finite
+C11-A independently accepted ADR-0012, and its design is now implemented for a
+separate implementation-readiness review. C11 has not been executed and no C11
+artifact or result exists. The frozen FD001-only design uses one seed-13 HGB
+predictor, a disjoint 60-engine fit role and 40-engine finite
 reservoir, the exact existing `generate_cut_points` algorithm, exact
 combinatorial subset integration, six attainable size/alpha cells, continuous
 Beta and finite-evaluation beta-binomial references, and an engine-weighted
@@ -99,9 +101,10 @@ treats deviation from the references--not raw draw variance--as the scientific
 quantity. C11 is retrospectively motivated by inspected C01--C08 outcomes and
 prospectively frozen only with respect to future C11 computation; it is a
 descriptive audit, not confirmatory preregistration. No binary adequacy or
-material-departure classification is permitted. Independent C11-A review is
-required before config or production implementation; a separate
-implementation-readiness review is required before execution.
+material-departure classification is permitted. The completed C11-A review
+preceded configuration and production implementation; the separate
+implementation-readiness review must pass before execution or official artifact
+generation.
 
 C12 is optional and must not precede the reviewed C11 mechanism result. If
 retained, only Conditions A/B may be designed. Target calibration and evaluation

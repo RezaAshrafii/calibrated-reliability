@@ -1,0 +1,62 @@
+experiment_id: C11
+source: FD001
+target: FD001
+evaluation_unit: engine_endpoint_finite_reservoir
+predictor_seed: 13
+split_seed: 13
+cut_point_seed: 13
+roles:
+  predictor_fit_engines: 60
+  reservoir_engines: 40
+rul_cap: 125
+preprocessing:
+  temporal_windows: [5, 10, 20]
+  variance_threshold: 0.0
+calibration:
+  min_observed_cycles: 30
+  lower_fraction: 0.40
+  upper_fraction: 0.90
+model:
+  type: hist_gradient_boosting
+  max_iter: 50
+  learning_rate: 0.05
+  max_leaf_nodes: 31
+  l2_regularization: 1.0
+  random_state: 13
+cells:
+  - {role: primary, n_cal: 10, alpha: 0.10, status: evaluate}
+  - {role: primary, n_cal: 15, alpha: 0.10, status: evaluate}
+  - {role: primary, n_cal: 20, alpha: 0.10, status: evaluate}
+  - {role: primary, n_cal: 30, alpha: 0.10, status: evaluate}
+  - {role: sensitivity, n_cal: 10, alpha: 0.05, status: not_evaluated_due_to_unattainable_finite_rank}
+  - {role: sensitivity, n_cal: 15, alpha: 0.05, status: not_evaluated_due_to_unattainable_finite_rank}
+  - {role: sensitivity, n_cal: 20, alpha: 0.05, status: evaluate}
+  - {role: sensitivity, n_cal: 30, alpha: 0.05, status: evaluate}
+  - {role: excluded, n_cal: 40, alpha: 0.10, status: not_evaluated_due_to_degenerate_full_reservoir_subset}
+  - {role: excluded, n_cal: 40, alpha: 0.05, status: not_evaluated_due_to_degenerate_full_reservoir_subset}
+exact_distribution:
+  method: combinatorial_order_statistic_multiplicity
+  reservoir_size: 40
+  probability_tolerance: 1.0e-12
+  tie_policy: exact_round_trip_float64
+references:
+  continuous: beta
+  finite_evaluation: beta_binomial
+  evaluation_endpoints: 100
+discrepancies:
+  metrics:
+    - ks_distance
+    - signed_mean_difference
+    - signed_severe_tail_difference
+    - signed_population_sd_difference
+    - wasserstein_1
+  signed_orientation: finite_reservoir_minus_reference
+  severe_undercoverage_margin: 0.10
+  quadrature_atol: 1.0e-12
+  quadrature_rtol: 1.0e-12
+  reconstruction_atol: 1.0e-12
+  reconstruction_rtol: 1.0e-12
+observation_diagnostic:
+  metric: empirical_wasserstein_1
+  unit: observed_cycles
+  weighting: equal_engine

@@ -46,7 +46,7 @@ silently reduced.
 | C06 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED | exploratory/appendix |
 | C07 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED | exploratory/appendix |
 | C08 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED | exploratory/appendix; anchor saturation diagnostic |
-| C11 | NOT IMPLEMENTED | NOT EXECUTED | NOT VERIFIED | NOT ELIGIBLE | candidate primary mechanism audit |
+| C11 | IMPLEMENTED | NOT EXECUTED | NOT VERIFIED | NOT ELIGIBLE | candidate primary mechanism audit; readiness review pending |
 | C12 | NOT IMPLEMENTED | NOT EXECUTED | NOT VERIFIED | NOT ELIGIBLE | optional oracle/supporting diagnostic |
 
 The lifecycle definitions are normative in `REPRODUCIBILITY.md`. `REPORTED`

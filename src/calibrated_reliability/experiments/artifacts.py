@@ -21,6 +21,7 @@ from calibrated_reliability.experiments.c05 import C05Config
 from calibrated_reliability.experiments.c06 import C06Condition, C06Config
 from calibrated_reliability.experiments.c07 import C07Config, C07Result
 from calibrated_reliability.experiments.c08 import C08Config
+from calibrated_reliability.experiments.c11 import C11_ADR_PATH, C11Config, C11Result
 
 
 def _repository_root() -> Path:
@@ -691,6 +692,97 @@ def write_c08_run(
             "bootstrap_interpretation": "conditional_fixed_path_summary; ACI trajectory not rerun",
             "adaptive": config.as_dict()["adaptive"],
             "quantiles": result.quantiles,
+            "artifacts": hashes,
+        }
+        _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))
+        _publish_directory(temporary_dir, run_dir)
+        return run_dir
+    except Exception:
+        shutil.rmtree(temporary_dir, ignore_errors=True)
+        raise
+
+
+def write_c11_run(
+    output_root: Path,
+    sha: str,
+    config: C11Config,
+    result: C11Result,
+    config_path: Path,
+    registry_path: Path,
+    data_provenance: dict[str, dict[str, Any]],
+) -> Path:
+    """Write one immutable, independently reconstructible C11 artifact."""
+    config.validate()
+    if re.fullmatch(r"[0-9a-f]{40}", sha) is None:
+        raise ValueError("C11 Git SHA must be 40 lowercase hexadecimal characters")
+    run_id = f"C11_FD001_{sha[:12]}_seed_{config.predictor_seed}"
+    run_dir = output_root / run_id
+    output_root.mkdir(parents=True, exist_ok=True)
+    if run_dir.exists():
+        raise FileExistsError(run_dir)
+    temporary_dir = Path(tempfile.mkdtemp(prefix=f".{run_id}.", dir=output_root))
+    try:
+        contents = {
+            "split_manifest.json": _json_bytes(result.split_manifest),
+            "reservoir_scores.csv": result.reservoir_scores.to_csv(index=False).encode(),
+            "evaluation_scores.csv": result.evaluation_scores.to_csv(index=False).encode(),
+            "enumeration_cells.csv": result.enumeration_cells.to_csv(index=False).encode(),
+            "quantile_distribution.csv": result.quantile_distribution.to_csv(index=False).encode(),
+            "beta_binomial_distribution.csv": result.beta_binomial_distribution.to_csv(
+                index=False
+            ).encode(),
+            "reference_summary.json": _json_bytes(result.reference_summary),
+            "distribution_summary.csv": result.distribution_summary.to_csv(index=False).encode(),
+            "observation_mechanism.json": _json_bytes(result.observation_mechanism),
+            "resolved_config.json": _json_bytes(config.as_dict()),
+            "run.log": (
+                f"experiment_id=C11\nsource=FD001\ntarget=FD001\n"
+                f"predictor_seed={config.predictor_seed}\ngit_sha={sha}\n"
+                "status=completed\n"
+            ).encode(),
+        }
+        hashes = {
+            name: _write_bytes(temporary_dir / name, content) for name, content in contents.items()
+        }
+        adr_path = _repository_root() / C11_ADR_PATH
+        manifest = {
+            "run_id": run_id,
+            "experiment_id": "C11",
+            "source": "FD001",
+            "target": "FD001",
+            "evaluation_unit": "engine_endpoint_finite_reservoir",
+            "predictor_seed": config.predictor_seed,
+            "split_seed": config.split_seed,
+            "cut_point_seed": config.cut_point_seed,
+            "rul_cap": config.rul_cap,
+            "git": {"sha": sha, "dirty": False},
+            "data": data_provenance,
+            "configuration": {
+                "path": config_path.as_posix(),
+                "sha256": compute_sha256(config_path),
+            },
+            "data_registry": {
+                "path": registry_path.as_posix(),
+                "sha256": compute_sha256(registry_path),
+            },
+            "lockfile": {
+                "path": "uv.lock",
+                "sha256": compute_sha256(_repository_root() / "uv.lock"),
+            },
+            "accepted_design_adr": {
+                "path": C11_ADR_PATH,
+                "sha256": compute_sha256(adr_path),
+            },
+            "environment": _environment(),
+            "split_manifest": result.split_manifest,
+            "calibration_cut_points": result.cut_points,
+            "preprocessing": {"feature_names": result.feature_names},
+            "model": result.model_specification,
+            "exact_distribution": config.as_dict()["exact_distribution"],
+            "references": config.as_dict()["references"],
+            "discrepancies": config.as_dict()["discrepancies"],
+            "observation_diagnostic": config.as_dict()["observation_diagnostic"],
+            "declared_cells": config.as_dict()["cells"],
             "artifacts": hashes,
         }
         _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))

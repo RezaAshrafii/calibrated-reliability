@@ -2,10 +2,10 @@
 
 ## Status
 
-Proposed -- design only. This ADR must pass independent C11-A review before a
-C11 configuration, production module, runner, or artifact writer is added. A
-separate implementation-readiness review is required before execution. No C11
-result or artifact exists at this checkpoint.
+Accepted design. Independent C11-A review passed before the configuration,
+production module, runner, artifact writer, and behavioral tests were added.
+A separate implementation-readiness review is required before execution or
+official artifact generation. No C11 result or artifact exists at this checkpoint.
 
 ## Decision context
 
@@ -269,10 +269,10 @@ evidence consistent with engine dependence, a finite reservoir, endpoint-grid
 effects, or observation-mechanism mismatch. C11 cannot identify which factor is
 causal without an additional reviewed design.
 
-## Required future configuration contract
+## Implemented configuration contract
 
-After this ADR passes review, a separate implementation commit may add a
-fail-closed configuration containing exactly the frozen values above. It must
+The post-C11-A implementation adds a fail-closed configuration containing
+exactly the frozen values above. It must
 reject unknown fields, extra targets or models, altered role sizes, changed
 seeds, changed cut policy, changed cap, unsupported cells, numeric strings,
 booleans, NaN, infinity, duplicate cells, and any unattainable cell marked for
@@ -319,9 +319,9 @@ denominator. CSV reconstruction must use `float_precision="round_trip"`.
 Artifact publication must use the repository's immutable final publication
 guard and remove temporary directories after failure.
 
-## Required implementation tests before execution
+## Implemented behavioral contract before execution
 
-The later implementation checkpoint must add behavioral tests for:
+The implementation checkpoint includes behavioral tests for:
 
 - exact 60/40 role assignment and complete/disjoint engine coverage;
 - exclusion of reservoir engines from temporal and model fitting;
@@ -389,7 +389,7 @@ error and freezes cut points so engine-subset selection is the only conceptual
 random variable. It also makes the known Beta/rank behavior a frozen analytic
 reference rather than a result to be rediscovered.
 
-The design does not yet authorize implementation or execution. A high-level
-independent C11-A review must confirm the estimand, roles, attainable cells,
-exact combinatorial distribution, references, observation diagnostics,
-artifacts, tests, claim boundary, and stop rules.
+The accepted design authorized implementation but does not authorize execution.
+The implementation-readiness review must confirm faithful code, configuration,
+data-role isolation, exact calculations, artifacts, tests, and provenance before
+the runner may produce an official C11 artifact.

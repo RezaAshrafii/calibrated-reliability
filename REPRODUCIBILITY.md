@@ -19,8 +19,8 @@ split manifests, predictions, and metrics can be traced together.
 
 C01--C08 are `IMPLEMENTED`, `EXECUTED`, `VERIFIED`, and `REPORTED`. Gate D uses
 `docs/artifact_index.yaml` and `scripts/build_results.py` as the only allowed
-numerical reporting path. C11 and C12 are not implemented and are not eligible
-for reporting.
+numerical reporting path. C11 is implemented but not executed or verified, and
+C12 is not implemented; neither is eligible for reporting.
 
 ## Reproduction contract
 
