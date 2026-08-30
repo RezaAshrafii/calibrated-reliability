@@ -46,8 +46,10 @@ an undeclared sensitivity condition.
 - Historical C08 artifacts generated under `legacy_max_clamp` remain immutable.
   Future C08 runs must retain explicit rank, attainability, regime, and policy
   diagnostics.
-- Do not run C11 or C12 from this runbook. C11 implementation exists only for
-  readiness review and has not passed its execution gate; C12 is not implemented.
+- The single authorized C11 execution is recorded in `docs/C11_EXECUTION.md`.
+  Preserve that output unchanged and do not overwrite or silently rerun it.
+  C11 remains unverified and unreportable until its artifact-level review
+  passes. C12 is not implemented and has no authorized command.
 
 ## Deterministic reporting
 

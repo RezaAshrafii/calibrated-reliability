@@ -23,7 +23,7 @@ def test_active_registry_matches_reframed_scope() -> None:
         assert f"| {removed_id} |" not in registry
 
     assert "| C11 | candidate RQ2 mechanism |" in registry
-    assert "IMPLEMENTED / NOT EXECUTED / NOT VERIFIED / NOT REPORTED" in registry
+    assert "IMPLEMENTED / EXECUTED / NOT VERIFIED / NOT REPORTED" in registry
     assert "MALT experiments M01--M08 are deferred and not implemented" in registry
 
 
@@ -47,10 +47,10 @@ def test_future_experiments_remain_blocked_and_oracle_labeled() -> None:
     results = _read("docs/RESULTS.md")
 
     assert "The completed C11-A review" in protocol
-    assert "implementation-readiness review must pass before execution" in protocol
+    assert "implementation-readiness reviews passed" in protocol
     oracle_label = "ORACLE / DIAGNOSTIC - NOT A DEPLOYMENT METHOD"
     assert oracle_label in protocol
-    assert "| C11 | IMPLEMENTED | NOT EXECUTED |" in results
+    assert "| C11 | IMPLEMENTED | EXECUTED |" in results
     assert "| C12 | NOT IMPLEMENTED | NOT EXECUTED |" in results
 
 
@@ -95,7 +95,7 @@ def test_reporting_status_cannot_be_inferred_from_files() -> None:
     assert "reports/results/summary.csv" in results
     assert "they are never converted to zero" in results
     assert "the aggregate remains `PENDING`" in results
-    assert "| C11 | IMPLEMENTED | NOT EXECUTED | NOT VERIFIED | NOT ELIGIBLE |" in results
+    assert "| C11 | IMPLEMENTED | EXECUTED | NOT VERIFIED | NOT ELIGIBLE |" in results
 
 
 def test_gate_d_builder_and_artifact_index_are_the_only_reporting_path() -> None:
@@ -140,7 +140,7 @@ def test_gate_d_environment_is_exact_and_revalidated() -> None:
     assert "direct-package versions" in reproducibility
 
 
-def test_c11_accepted_design_is_implemented_and_execution_remains_blocked() -> None:
+def test_c11_accepted_design_execution_is_recorded_and_verification_remains_blocked() -> None:
     adr = _normalized("docs/decisions/ADR-0012-c11-finite-reservoir-design.md")
     readme = _normalized("README.md")
     protocol = _normalized("docs/protocol.md")
@@ -169,12 +169,15 @@ def test_c11_accepted_design_is_implemented_and_execution_remains_blocked() -> N
     assert "makes no binary `adequately_explained`" in adr
     assert "retrospectively motivated, prospectively frozen descriptive audit" in adr
     assert "does not authorize execution" in adr
-    assert "implementation-readiness review" in readme
+    assert "implementation-readiness review passed" in readme
     assert "not confirmatory preregistration" in readme
     assert "The completed C11-A review" in protocol
     assert "No binary adequacy or material-departure classification" in protocol
     assert "| C11 | candidate RQ2 mechanism |" in registry
-    assert "run_c11" not in runbook
+    assert "docs/C11_EXECUTION.md" in runbook
+    execution = _normalized("docs/C11_EXECUTION.md")
+    assert "cba16d0477ab19bf07ec02dd4be151e6b5fb670e" in execution
+    assert "EXECUTED / NOT VERIFIED / NOT REPORTED" in execution
     assert (ROOT / "configs" / "cmapss" / "finite_reservoir.yaml").is_file()
     assert (ROOT / "src" / "calibrated_reliability" / "experiments" / "c11.py").is_file()
     assert (ROOT / "scripts" / "run_c11_finite_reservoir.py").is_file()

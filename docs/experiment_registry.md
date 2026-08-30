@@ -23,15 +23,16 @@ tracked Gate D results builder; it cannot be inferred from local output files.
 Every C01--C08 row is `REPORTED` through the tracked Gate D artifact index and
 deterministic builder. This status does not extend to C11 or C12.
 
-## Implemented future experiment awaiting execution review
+## Executed candidate experiment awaiting artifact verification
 
 | ID | Role | Method | Source -> target | Unit | Alpha | Seed | Config | Lifecycle | Reporting class |
 |---|---|---|---|---|---|---|---|---|---|
-| C11 | candidate RQ2 mechanism | Exact finite-reservoir conformal audit | FD001 -> FD001 | engine endpoint finite reservoir | .10,.05 | 13 | `configs/cmapss/finite_reservoir.yaml` | IMPLEMENTED / NOT EXECUTED / NOT VERIFIED / NOT REPORTED | candidate primary mechanism audit |
+| C11 | candidate RQ2 mechanism | Exact finite-reservoir conformal audit | FD001 -> FD001 | engine endpoint finite reservoir | .10,.05 | 13 | `configs/cmapss/finite_reservoir.yaml` | IMPLEMENTED / EXECUTED / NOT VERIFIED / NOT REPORTED | candidate primary mechanism audit |
 
 C11-A accepted the narrow, retrospectively motivated and prospectively frozen
-descriptive design. The implementation-readiness review must pass before the
-runner may execute or publish an official artifact.
+descriptive design. The implementation-readiness review passed before the one
+authorized execution from clean commit `cba16d0`. The resulting immutable local
+artifact is awaiting independent reconstruction and is not yet reportable.
 
 ## Candidate future work
 

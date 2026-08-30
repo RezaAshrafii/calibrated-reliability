@@ -31,9 +31,11 @@ boundary.
   predictor is held fixed?
 
 RQ1 is addressed only as replication/context by C01--C04. C05--C08 are
-exploratory evidence that motivates RQ2 but does not answer it. The C11-A review
-accepted ADR-0012 and its implementation now awaits independent readiness
-approval before any execution. RQ3 is a non-deployable oracle contrast and is
+exploratory evidence that motivates RQ2 but does not answer it. The C11-A and
+implementation-readiness reviews passed, and the frozen C11 design was executed
+once from clean commit `cba16d0`; its artifact now awaits independent
+reconstruction before any result is verified or reported. RQ3 is a
+non-deployable oracle contrast and is
 considered only after C11; it is not a novel repair method.
 
 ## Evaluation units and splits
@@ -87,9 +89,10 @@ indexed verified artifacts.
 
 ## Future design gates
 
-C11-A independently accepted ADR-0012, and its design is now implemented for a
-separate implementation-readiness review. C11 has not been executed and no C11
-artifact or result exists. The frozen FD001-only design uses one seed-13 HGB
+C11-A independently accepted ADR-0012, and a separate implementation-readiness
+review passed before the single authorized execution. One immutable local C11
+artifact now exists from clean commit `cba16d0`; its existence establishes only
+`EXECUTED`, not `VERIFIED` or `REPORTED`. The frozen FD001-only design uses one seed-13 HGB
 predictor, a disjoint 60-engine fit role and 40-engine finite
 reservoir, the exact existing `generate_cut_points` algorithm, exact
 combinatorial subset integration, six attainable size/alpha cells, continuous
@@ -104,8 +107,9 @@ prospectively frozen only with respect to future C11 computation; it is a
 descriptive audit, not confirmatory preregistration. No binary adequacy or
 material-departure classification is permitted. The completed C11-A review
 preceded configuration and production implementation; the separate
-implementation-readiness review must pass before execution or official artifact
-generation.
+implementation-readiness review passed before execution and official artifact
+generation. Independent artifact-level reconstruction remains mandatory before
+verification or reporting.
 
 C12 is optional and must not precede the reviewed C11 mechanism result. If
 retained, only Conditions A/B may be designed. Target calibration and evaluation

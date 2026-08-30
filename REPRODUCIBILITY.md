@@ -19,8 +19,10 @@ split manifests, predictions, and metrics can be traced together.
 
 C01--C08 are `IMPLEMENTED`, `EXECUTED`, `VERIFIED`, and `REPORTED`. Gate D uses
 `docs/artifact_index.yaml` and `scripts/build_results.py` as the only allowed
-numerical reporting path. C11 is implemented but not executed or verified, and
-C12 is not implemented; neither is eligible for reporting.
+numerical reporting path. C11 is implemented and executed once from clean
+commit `cba16d0`, but remains unverified and ineligible for reporting pending
+independent artifact reconstruction. C12 is not implemented and is also
+ineligible for reporting.
 
 ## Reproduction contract
 
@@ -33,7 +35,9 @@ C12 is not implemented; neither is eligible for reporting.
 5. Run every quality command in `AGENTS.md`.
 6. Commit source changes and require an empty `git status --short` before an
    experiment.
-7. Use only the frozen C01--C08 commands in `docs/RUNBOOK.md`.
+7. Use only the frozen C01--C08 commands in `docs/RUNBOOK.md`. The one authorized
+   C11 execution is recorded in `docs/C11_EXECUTION.md`; do not overwrite or
+   silently rerun it.
 8. Preserve each run directory unchanged. Never replace, merge, or edit an
    existing artifact tree.
 9. Verify manifest hashes, producing commit, configuration, data provenance,
