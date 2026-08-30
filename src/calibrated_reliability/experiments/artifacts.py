@@ -8,6 +8,7 @@ import json
 import platform
 import re
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -69,6 +70,25 @@ def _publish_directory(temporary_dir: Path, run_dir: Path) -> None:
     if run_dir.exists():
         raise FileExistsError(run_dir)
     temporary_dir.rename(run_dir)
+
+
+def _validate_c11_publication_state(sha: str, tracked_inputs: dict[Path, str]) -> None:
+    """Fail if Git or a C11 provenance input changed during construction."""
+    repository = _repository_root()
+    current_sha = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=repository, text=True
+    ).strip()
+    if current_sha != sha:
+        raise RuntimeError("C11 Git revision changed during artifact construction")
+    if subprocess.check_output(
+        ["git", "status", "--porcelain"], cwd=repository, text=True
+    ).strip():
+        raise RuntimeError("C11 requires a clean Git worktree at artifact publication")
+    for path, expected_hash in tracked_inputs.items():
+        if not path.is_file() or compute_sha256(path) != expected_hash:
+            raise RuntimeError(
+                f"C11 provenance input changed during artifact construction: {path}"
+            )
 
 
 def write_c01_run(
@@ -715,6 +735,15 @@ def write_c11_run(
     config.validate()
     if re.fullmatch(r"[0-9a-f]{40}", sha) is None:
         raise ValueError("C11 Git SHA must be 40 lowercase hexadecimal characters")
+    adr_path = _repository_root() / C11_ADR_PATH
+    lock_path = _repository_root() / "uv.lock"
+    tracked_inputs = {
+        config_path.resolve(): compute_sha256(config_path),
+        registry_path.resolve(): compute_sha256(registry_path),
+        adr_path.resolve(): compute_sha256(adr_path),
+        lock_path.resolve(): compute_sha256(lock_path),
+    }
+    _validate_c11_publication_state(sha, tracked_inputs)
     run_id = f"C11_FD001_{sha[:12]}_seed_{config.predictor_seed}"
     run_dir = output_root / run_id
     output_root.mkdir(parents=True, exist_ok=True)
@@ -744,7 +773,6 @@ def write_c11_run(
         hashes = {
             name: _write_bytes(temporary_dir / name, content) for name, content in contents.items()
         }
-        adr_path = _repository_root() / C11_ADR_PATH
         manifest = {
             "run_id": run_id,
             "experiment_id": "C11",
@@ -767,11 +795,11 @@ def write_c11_run(
             },
             "lockfile": {
                 "path": "uv.lock",
-                "sha256": compute_sha256(_repository_root() / "uv.lock"),
+                "sha256": tracked_inputs[lock_path.resolve()],
             },
             "accepted_design_adr": {
                 "path": C11_ADR_PATH,
-                "sha256": compute_sha256(adr_path),
+                "sha256": tracked_inputs[adr_path.resolve()],
             },
             "environment": _environment(),
             "split_manifest": result.split_manifest,
@@ -786,6 +814,7 @@ def write_c11_run(
             "artifacts": hashes,
         }
         _write_bytes(temporary_dir / "manifest.json", _json_bytes(manifest))
+        _validate_c11_publication_state(sha, tracked_inputs)
         _publish_directory(temporary_dir, run_dir)
         return run_dir
     except Exception:

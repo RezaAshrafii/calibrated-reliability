@@ -226,7 +226,10 @@ class C11Result:
 
 
 def _numeric_scores(values: Any, name: str) -> np.ndarray:
-    scores = np.asarray(pd.to_numeric(pd.Series(values), errors="raise").to_numpy(dtype="float64"))
+    raw = pd.Series(values)
+    if raw.map(lambda value: isinstance(value, (bool, np.bool_))).any():
+        raise ValueError(f"{name} must not contain boolean values")
+    scores = np.asarray(pd.to_numeric(raw, errors="raise").to_numpy(dtype="float64"))
     if len(scores) == 0 or not np.isfinite(scores).all() or (scores < 0).any():
         raise ValueError(f"{name} must be non-empty, finite, and nonnegative")
     return scores
@@ -329,10 +332,17 @@ def beta_binomial_reference(n_cal: int, alpha: float, endpoints: int = 100) -> p
 
 
 def _weighted_distribution(values: Any, probabilities: Any) -> tuple[np.ndarray, np.ndarray]:
+    raw_values = pd.Series(values)
+    raw_probabilities = pd.Series(probabilities)
+    if (
+        raw_values.map(lambda value: isinstance(value, (bool, np.bool_))).any()
+        or raw_probabilities.map(lambda value: isinstance(value, (bool, np.bool_))).any()
+    ):
+        raise ValueError("weighted distribution must not contain boolean values")
     frame = pd.DataFrame(
         {
-            "value": pd.to_numeric(pd.Series(values), errors="raise"),
-            "probability": pd.to_numeric(pd.Series(probabilities), errors="raise"),
+            "value": pd.to_numeric(raw_values, errors="raise"),
+            "probability": pd.to_numeric(raw_probabilities, errors="raise"),
         }
     )
     if len(frame) == 0 or not np.isfinite(frame.to_numpy(dtype="float64")).all():
@@ -374,7 +384,14 @@ def weighted_ks_distance(
         raise ValueError("Specify exactly one C11 reference distribution")
     if beta_parameters is not None:
         a, b = beta_parameters
-        if not isinstance(a, int) or not isinstance(b, int) or a < 1 or b < 1:
+        if (
+            isinstance(a, bool)
+            or isinstance(b, bool)
+            or not isinstance(a, int)
+            or not isinstance(b, int)
+            or a < 1
+            or b < 1
+        ):
             raise ValueError("C11 Beta parameters must be positive integers")
         right = _discrete_cdf(values, values, probabilities)
         left = _discrete_cdf_left(values, values, probabilities)

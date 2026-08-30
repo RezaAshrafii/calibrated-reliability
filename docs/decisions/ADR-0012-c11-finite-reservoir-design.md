@@ -317,7 +317,12 @@ least:
 No table may collapse an excluded cell into zero or omit it from a declared
 denominator. CSV reconstruction must use `float_precision="round_trip"`.
 Artifact publication must use the repository's immutable final publication
-guard and remove temporary directories after failure.
+guard and remove temporary directories after failure. The runner must revalidate
+the three registered FD001 inputs plus the configuration and registry after
+computation. Immediately before atomic publication, the writer must revalidate
+the unchanged clean Git revision and unchanged configuration, registry,
+lockfile, and accepted-ADR hashes. Any intervening change fails closed and
+removes the temporary artifact directory.
 
 ## Implemented behavioral contract before execution
 

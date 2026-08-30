@@ -164,6 +164,8 @@ def test_c11_accepted_design_is_implemented_and_execution_remains_blocked() -> N
     assert "evaluating both the left limit and right-continuous CDF" in adr
     assert "atol=1e-12, rtol=1e-12" in adr
     assert "empirical 1-Wasserstein distance, in observed cycle units" in adr
+    assert "Immediately before atomic publication" in adr
+    assert "unchanged clean Git revision" in adr
     assert "makes no binary `adequately_explained`" in adr
     assert "retrospectively motivated, prospectively frozen descriptive audit" in adr
     assert "does not authorize execution" in adr

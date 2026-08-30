@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import itertools
 import json
 import math
 import random
+from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
 import pytest
 import yaml
+from click.testing import CliRunner
 from scipy.special import beta as beta_function
 from scipy.stats import beta as beta_distribution
 from scipy.stats import wasserstein_distance
@@ -33,6 +37,14 @@ from calibrated_reliability.experiments.c11 import (
     run_c11,
     weighted_ks_distance,
 )
+
+_RUNNER_SPEC = importlib.util.spec_from_file_location(
+    "c11_runner_for_test", Path("scripts/run_c11_finite_reservoir.py")
+)
+if _RUNNER_SPEC is None or _RUNNER_SPEC.loader is None:
+    raise RuntimeError("Could not load the C11 runner for behavioral testing")
+runner_module = importlib.util.module_from_spec(_RUNNER_SPEC)
+_RUNNER_SPEC.loader.exec_module(runner_module)
 
 
 def _config_text() -> str:
@@ -80,6 +92,29 @@ def test_c11_configuration_rejects_unknown_and_malformed_fields() -> None:
         C11Config.from_yaml(yaml.safe_dump(payload))
     with pytest.raises(ValueError, match="must be a mapping"):
         C11Config.from_yaml("- C11\n")
+
+
+def test_c11_configuration_revalidation_rejects_manual_payload_drift() -> None:
+    config = C11Config.from_yaml(_config_text())
+    payload = config.as_dict()
+    payload["predictor_seed"] = 37
+    with pytest.raises(ValueError, match="frozen C11 design"):
+        C11Config(payload=payload, cells=config.cells).validate()
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        lambda: exact_order_statistic_distribution([False, True, 2.0], 2, 0.50),
+        lambda: weighted_ks_distance([True], [1.0], [0.5], [1.0]),
+        lambda: weighted_ks_distance([0.5], [True], [0.5], [1.0]),
+        lambda: weighted_ks_distance([0.5], [1.0], beta_parameters=(True, 2)),
+        lambda: distribution_discrepancies([0.5], [1.0], 0.10, beta_parameters=(2, False)),
+    ],
+)
+def test_c11_mathematical_apis_reject_boolean_inputs(operation: Callable[[], object]) -> None:
+    with pytest.raises(ValueError, match="boolean|positive integers"):
+        operation()
 
 
 def test_c11_declared_cells_have_exact_ranks_supports_and_exclusions() -> None:
@@ -218,6 +253,23 @@ def test_weighted_ks_uses_both_jump_limits() -> None:
         abs(1.0 - beta_distribution.cdf(0.75, 2, 2)),
     )
     assert beta_ks == pytest.approx(manual)
+
+
+def test_weighted_ks_handles_shared_boundary_and_disjoint_jumps() -> None:
+    assert weighted_ks_distance([0.0, 1.0], [0.3, 0.7], [0.0, 1.0], [0.8, 0.2]) == pytest.approx(
+        0.5
+    )
+    assert weighted_ks_distance(
+        [0.0, 0.5, 1.0],
+        [0.2, 0.3, 0.5],
+        [0.25, 0.75],
+        [0.4, 0.6],
+    ) == pytest.approx(0.5)
+
+
+def test_continuous_beta_wasserstein_matches_closed_form_uniform_case() -> None:
+    result = distribution_discrepancies([0.5], [1.0], 0.10, beta_parameters=(1, 1))
+    assert result["wasserstein_1"] == pytest.approx(0.25, abs=1.0e-12)
 
 
 def test_discrepancy_orientation_and_wasserstein_units_are_frozen() -> None:
@@ -394,6 +446,14 @@ def test_c11_future_reservoir_rows_and_labels_cannot_change_frozen_inputs(
     pd.testing.assert_frame_equal(first.distribution_summary, second.distribution_summary)
     altered_rul = pd.DataFrame({"rul": np.arange(100)[::-1]})
     third = run_c11(train, test, altered_rul, config)
+    assert first.split_manifest == third.split_manifest
+    assert first.cut_points == third.cut_points
+    pd.testing.assert_frame_equal(first.reservoir_scores, third.reservoir_scores)
+    pd.testing.assert_frame_equal(first.enumeration_cells, third.enumeration_cells)
+    pd.testing.assert_frame_equal(
+        first.beta_binomial_distribution, third.beta_binomial_distribution
+    )
+    assert first.reference_summary == third.reference_summary
     assert first.observation_mechanism["distance"] == third.observation_mechanism["distance"]
     assert (
         first.observation_mechanism["official_observed_endpoint_cycles"]
@@ -448,11 +508,14 @@ def _write_inputs(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_c11_artifact_is_complete_hashed_and_immutable(
-    tmp_path: Path, synthetic_c11: tuple[C11Config, C11Result, pd.DataFrame]
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    synthetic_c11: tuple[C11Config, C11Result, pd.DataFrame],
 ) -> None:
     config, result, _ = synthetic_c11
     config_path, registry_path = _write_inputs(tmp_path)
     output = tmp_path / "outputs"
+    monkeypatch.setattr(artifacts_module, "_validate_c11_publication_state", lambda *args: None)
     run_dir = write_c11_run(output, "a" * 40, config, result, config_path, registry_path, {})
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["experiment_id"] == "C11"
@@ -487,6 +550,7 @@ def test_c11_failed_artifact_write_cleans_temporary_directory(
     config, result, _ = synthetic_c11
     config_path, registry_path = _write_inputs(tmp_path)
     original = artifacts_module._write_bytes
+    monkeypatch.setattr(artifacts_module, "_validate_c11_publication_state", lambda *args: None)
 
     def fail(path: Path, content: bytes) -> str:
         if path.name == "distribution_summary.csv":
@@ -498,6 +562,57 @@ def test_c11_failed_artifact_write_cleans_temporary_directory(
     with pytest.raises(OSError, match="simulated C11 failure"):
         write_c11_run(output, "a" * 40, config, result, config_path, registry_path, {})
     assert list(output.iterdir()) == []
+
+
+def test_c11_final_publication_revalidation_failure_cleans_temporary_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    synthetic_c11: tuple[C11Config, C11Result, pd.DataFrame],
+) -> None:
+    config, result, _ = synthetic_c11
+    config_path, registry_path = _write_inputs(tmp_path)
+    calls = 0
+
+    def reject_final(*args: object) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("simulated final provenance change")
+
+    monkeypatch.setattr(artifacts_module, "_validate_c11_publication_state", reject_final)
+    output = tmp_path / "outputs"
+    with pytest.raises(RuntimeError, match="final provenance"):
+        write_c11_run(output, "a" * 40, config, result, config_path, registry_path, {})
+    assert calls == 2
+    assert list(output.iterdir()) == []
+
+
+def test_c11_publication_state_checks_sha_cleanliness_and_input_hashes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tracked = tmp_path / "tracked.txt"
+    tracked.write_text("frozen", encoding="utf-8")
+    expected_hash = hashlib.sha256(tracked.read_bytes()).hexdigest()
+    outputs = iter(["a" * 40 + "\n", ""])
+    monkeypatch.setattr(
+        artifacts_module.subprocess,
+        "check_output",
+        lambda *args, **kwargs: next(outputs),
+    )
+    artifacts_module._validate_c11_publication_state("a" * 40, {tracked: expected_hash})
+
+    outputs = iter(["b" * 40 + "\n"])
+    with pytest.raises(RuntimeError, match="revision changed"):
+        artifacts_module._validate_c11_publication_state("a" * 40, {tracked: expected_hash})
+
+    outputs = iter(["a" * 40 + "\n", " M README.md\n"])
+    with pytest.raises(RuntimeError, match="clean Git worktree"):
+        artifacts_module._validate_c11_publication_state("a" * 40, {tracked: expected_hash})
+
+    tracked.write_text("changed", encoding="utf-8")
+    outputs = iter(["a" * 40 + "\n", ""])
+    with pytest.raises(RuntimeError, match="provenance input changed"):
+        artifacts_module._validate_c11_publication_state("a" * 40, {tracked: expected_hash})
 
 
 def test_c11_result_tables_reconstruct_distributions(
@@ -524,3 +639,103 @@ def test_c11_result_tables_reconstruct_distributions(
             ]
         ].to_numpy(dtype="float64")
     ).all()
+
+
+def test_c11_serialized_tables_independently_reconstruct_metrics_and_discrepancies(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    synthetic_c11: tuple[C11Config, C11Result, pd.DataFrame],
+) -> None:
+    config, result, _ = synthetic_c11
+    config_path, registry_path = _write_inputs(tmp_path)
+    monkeypatch.setattr(artifacts_module, "_validate_c11_publication_state", lambda *args: None)
+    run_dir = write_c11_run(
+        tmp_path / "outputs", "a" * 40, config, result, config_path, registry_path, {}
+    )
+    quantiles = pd.read_csv(run_dir / "quantile_distribution.csv", float_precision="round_trip")
+    evaluation = pd.read_csv(run_dir / "evaluation_scores.csv", float_precision="round_trip")
+    beta_binomial = pd.read_csv(
+        run_dir / "beta_binomial_distribution.csv", float_precision="round_trip"
+    )
+    summary = pd.read_csv(run_dir / "distribution_summary.csv", float_precision="round_trip")
+    residuals = evaluation["residual"].to_numpy(dtype="float64")
+    for row in quantiles.itertuples(index=False):
+        assert row.coverage == pytest.approx(float(np.mean(residuals <= row.quantile)))
+        expected_nis = (
+            np.mean(
+                2.0 * row.quantile + (2.0 / row.alpha) * np.maximum(residuals - row.quantile, 0.0)
+            )
+            / 125.0
+        )
+        assert row.normalized_interval_score == pytest.approx(expected_nis)
+    for row in summary.loc[summary["status"] == "evaluated"].itertuples(index=False):
+        finite = quantiles.loc[quantiles["cell_id"] == row.cell_id]
+        if row.reference == "continuous_beta":
+            rank = math.ceil((row.n_cal + 1) * (1.0 - row.alpha))
+            kwargs = {"beta_parameters": (rank, row.n_cal + 1 - rank)}
+        else:
+            reference = beta_binomial.loc[beta_binomial["cell_id"] == row.cell_id]
+            kwargs = {
+                "reference_values": reference["coverage"],
+                "reference_probabilities": reference["probability"],
+            }
+        rebuilt = distribution_discrepancies(
+            finite["coverage"], finite["probability"], row.alpha, **kwargs
+        )
+        for name, value in rebuilt.items():
+            assert getattr(row, name) == pytest.approx(value, abs=1.0e-12, rel=1.0e-12)
+
+
+def test_c11_runner_validates_inputs_twice_and_calls_run_and_write_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_path, registry_path = _write_inputs(tmp_path)
+    records = [
+        SimpleNamespace(
+            filename=name,
+            sha256="0" * 64,
+            expected_bytes=1,
+            expected_rows=1,
+            expected_engines=1,
+        )
+        for name in ("train_FD001.txt", "test_FD001.txt", "RUL_FD001.txt")
+    ]
+    validation_calls: list[str] = []
+    monkeypatch.setattr(runner_module, "load_registry", lambda path: records)
+    monkeypatch.setattr(
+        runner_module,
+        "validate_file",
+        lambda root, record: (
+            validation_calls.append(record.filename) or SimpleNamespace(valid=True)
+        ),
+    )
+    sentinel_frame = pd.DataFrame()
+    monkeypatch.setattr(runner_module, "load_train", lambda path: sentinel_frame)
+    monkeypatch.setattr(runner_module, "load_test", lambda path: sentinel_frame)
+    monkeypatch.setattr(runner_module, "load_rul", lambda path: sentinel_frame)
+    run_calls: list[object] = []
+    result = object()
+    monkeypatch.setattr(
+        runner_module,
+        "run_c11",
+        lambda *args: run_calls.append(args) or result,
+    )
+    write_calls: list[object] = []
+    monkeypatch.setattr(
+        runner_module,
+        "write_c11_run",
+        lambda *args: write_calls.append(args) or (tmp_path / "published"),
+    )
+    monkeypatch.setattr(
+        runner_module.subprocess,
+        "check_output",
+        lambda command, **kwargs: "a" * 40 + "\n" if "rev-parse" in command else "",
+    )
+    outcome = CliRunner().invoke(
+        runner_module.main,
+        ["--config", str(config_path), "--registry", str(registry_path)],
+    )
+    assert outcome.exit_code == 0, outcome.output
+    assert len(run_calls) == 1
+    assert len(write_calls) == 1
+    assert sorted(validation_calls) == sorted([record.filename for record in records] * 2)

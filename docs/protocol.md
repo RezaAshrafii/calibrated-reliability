@@ -31,8 +31,9 @@ boundary.
   predictor is held fixed?
 
 RQ1 is addressed only as replication/context by C01--C04. C05--C08 are
-exploratory evidence that motivates RQ2 but does not answer it. RQ2 requires a
-future C11 design ADR and review. RQ3 is a non-deployable oracle contrast and is
+exploratory evidence that motivates RQ2 but does not answer it. The C11-A review
+accepted ADR-0012 and its implementation now awaits independent readiness
+approval before any execution. RQ3 is a non-deployable oracle contrast and is
 considered only after C11; it is not a novel repair method.
 
 ## Evaluation units and splits

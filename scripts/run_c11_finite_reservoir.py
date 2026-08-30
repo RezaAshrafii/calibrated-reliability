@@ -10,7 +10,7 @@ from typing import Any
 import click
 
 from calibrated_reliability.data.loader import load_rul, load_test, load_train
-from calibrated_reliability.data.registry import load_registry, validate_file
+from calibrated_reliability.data.registry import compute_sha256, load_registry, validate_file
 from calibrated_reliability.experiments.artifacts import write_c11_run
 from calibrated_reliability.experiments.c11 import C11Config, run_c11
 
@@ -29,6 +29,8 @@ def main(config_path: Path, registry_path: Path, data_root: Path, output_root: P
     sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     if subprocess.check_output(["git", "status", "--porcelain"], text=True).strip():
         raise click.ClickException("C11 requires a clean Git worktree")
+    config_hash = compute_sha256(config_path)
+    registry_hash = compute_sha256(registry_path)
     config = C11Config.from_yaml(config_path.read_text(encoding="utf-8"))
     records = {record.filename: record for record in load_registry(registry_path)}
     names = ["train_FD001.txt", "test_FD001.txt", "RUL_FD001.txt"]
@@ -50,6 +52,14 @@ def main(config_path: Path, registry_path: Path, data_root: Path, output_root: P
         load_rul(data_root / "RUL_FD001.txt"),
         config,
     )
+    if (
+        compute_sha256(config_path) != config_hash
+        or compute_sha256(registry_path) != registry_hash
+    ):
+        raise click.ClickException("C11 configuration or registry changed during execution")
+    for name in names:
+        if not validate_file(data_root, records[name]).valid:
+            raise click.ClickException(f"C11 data changed during execution: {name}")
     run_dir = write_c11_run(
         output_root,
         sha,
