@@ -1,0 +1,11 @@
+cell_id,role,n_cal,alpha,status,requested_rank,finite_rank_attainable,regime,support_position_min,support_position_max,combination_count,finite_population_factor
+n10_alpha_0.1,primary,10,0.1,evaluate,10,True,max_statistic,10.0,40.0,847660528.0,0.7692307692307693
+n15_alpha_0.1,primary,15,0.1,evaluate,15,True,max_statistic,15.0,40.0,40225345056.0,0.6410256410256411
+n20_alpha_0.1,primary,20,0.1,evaluate,19,True,interior,19.0,39.0,137846528820.0,0.5128205128205128
+n30_alpha_0.1,primary,30,0.1,evaluate,28,True,interior,28.0,38.0,847660528.0,0.2564102564102564
+n10_alpha_0.05,sensitivity,10,0.05,not_evaluated_due_to_unattainable_finite_rank,11,False,finite_quantile_unattainable,,,,0.7692307692307693
+n15_alpha_0.05,sensitivity,15,0.05,not_evaluated_due_to_unattainable_finite_rank,16,False,finite_quantile_unattainable,,,,0.6410256410256411
+n20_alpha_0.05,sensitivity,20,0.05,evaluate,20,True,max_statistic,20.0,40.0,137846528820.0,0.5128205128205128
+n30_alpha_0.05,sensitivity,30,0.05,evaluate,30,True,max_statistic,30.0,40.0,847660528.0,0.2564102564102564
+n40_alpha_0.1,excluded,40,0.1,not_evaluated_due_to_degenerate_full_reservoir_subset,37,True,interior,,,,0.0
+n40_alpha_0.05,excluded,40,0.05,not_evaluated_due_to_degenerate_full_reservoir_subset,39,True,interior,,,,0.0

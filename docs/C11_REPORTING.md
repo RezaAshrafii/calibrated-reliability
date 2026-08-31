@@ -2,7 +2,7 @@
 
 ## Status
 
-`IMPLEMENTED REPORTING PATH / NOT YET PUBLISHED / NOT YET REPORTED`
+`PUBLISHED CANDIDATE / NOT YET VERIFIED / NOT YET REPORTED`
 
 The C11 reporting path is deliberately separate from the historical C01--C08
 Gate D builder. It consumes only the single immutable run identified by

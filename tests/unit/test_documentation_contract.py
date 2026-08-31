@@ -113,13 +113,13 @@ def test_gate_d_builder_and_artifact_index_are_the_only_reporting_path() -> None
     assert "manifest_set_sha256:" in index
 
 
-def test_c11_reporting_is_separate_and_not_published_before_review() -> None:
+def test_c11_reporting_is_separate_and_not_reported_before_review() -> None:
     contract = _normalized("docs/C11_REPORTING.md")
     index = _read("docs/c11_artifact_index.yaml")
     results = _read("docs/RESULTS.md")
 
     assert "separate from the historical C01--C08 Gate D builder" in contract
-    assert "NOT YET PUBLISHED / NOT YET REPORTED" in contract
+    assert "PUBLISHED CANDIDATE / NOT YET VERIFIED / NOT YET REPORTED" in contract
     assert "not an independent statistical reconstruction engine" in contract
     assert "must recompute" in contract
     assert "manifest_sha256:" in index

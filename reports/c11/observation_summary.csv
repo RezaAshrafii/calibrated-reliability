@@ -1,0 +1,2 @@
+metric,unit,weighting,distance,reservoir_engine_count,official_endpoint_count,evaluation_cap_saturation_fraction,reservoir_distinct_residuals,reservoir_residual_tied_rows
+empirical_wasserstein_1,observed_cycles,equal_engine,15.569999999999999,40,100,0.11,40,0
