@@ -15,7 +15,7 @@ This repository is a reproducible research project, not a demo application.
 - Do not weaken tests to make an implementation pass.
 - Use the tracked Python 3.11.9 interpreter for Gate D reconstruction; do not
   publish reports from another supported or locally convenient interpreter.
-- C11-A design review passed before implementation. Do not execute C11 or
-  generate official C11 artifacts until the implementation-readiness review
-  passes. Treat any future C12 target calibration as an oracle diagnostic,
-  never a deployment method.
+- C11-A design and implementation-readiness reviews must pass before any
+  controlled C11 execution or official reporting. During report review, do not
+  execute C11 or generate a second artifact. Treat any future C12 target
+  calibration as an oracle diagnostic, never a deployment method.

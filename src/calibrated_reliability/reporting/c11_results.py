@@ -36,6 +36,30 @@ EXPECTED_ROWS = {
     "reservoir_scores.csv": 40,
     "evaluation_scores.csv": 100,
 }
+EXPECTED_CELLS = {
+    ("n10_alpha_0.1", "primary", 10, 0.1, "evaluate"),
+    ("n15_alpha_0.1", "primary", 15, 0.1, "evaluate"),
+    ("n20_alpha_0.1", "primary", 20, 0.1, "evaluate"),
+    ("n30_alpha_0.1", "primary", 30, 0.1, "evaluate"),
+    ("n10_alpha_0.05", "sensitivity", 10, 0.05, "not_evaluated_due_to_unattainable_finite_rank"),
+    ("n15_alpha_0.05", "sensitivity", 15, 0.05, "not_evaluated_due_to_unattainable_finite_rank"),
+    ("n20_alpha_0.05", "sensitivity", 20, 0.05, "evaluate"),
+    ("n30_alpha_0.05", "sensitivity", 30, 0.05, "evaluate"),
+    (
+        "n40_alpha_0.1",
+        "excluded",
+        40,
+        0.1,
+        "not_evaluated_due_to_degenerate_full_reservoir_subset",
+    ),
+    (
+        "n40_alpha_0.05",
+        "excluded",
+        40,
+        0.05,
+        "not_evaluated_due_to_degenerate_full_reservoir_subset",
+    ),
+}
 
 
 def _sha256(path: Path) -> str:
@@ -117,6 +141,29 @@ def verify_c11_artifact(repository: Path, index_path: Path) -> tuple[dict[str, A
     git = manifest.get("git")
     if git != {"dirty": False, "sha": index["producing_git_sha"]}:
         raise ValueError("C11 producer provenance mismatch")
+    if manifest.get("source") != "FD001" or manifest.get("target") != "FD001":
+        raise ValueError("C11 source/target contract mismatch")
+    if manifest.get("evaluation_unit") != "engine_endpoint_finite_reservoir":
+        raise ValueError("C11 evaluation-unit contract mismatch")
+    config = manifest.get("configuration")
+    if not isinstance(config, dict) or set(config) != {"path", "sha256"}:
+        raise ValueError("C11 configuration provenance is incomplete")
+    config_path = repository / str(config["path"])
+    if config["path"] != "configs/cmapss/finite_reservoir.yaml":
+        raise ValueError("C11 configuration path is not frozen")
+    if not config_path.is_file() or _sha256(config_path) != config["sha256"]:
+        raise ValueError("C11 configuration provenance mismatch")
+    for key, relative in (
+        ("data_registry", "data/registry.yaml"),
+        ("lockfile", "uv.lock"),
+        ("accepted_design_adr", "docs/decisions/ADR-0012-c11-finite-reservoir-design.md"),
+    ):
+        record = manifest.get(key)
+        if not isinstance(record, dict) or record.get("path") != relative:
+            raise ValueError(f"C11 {key} provenance is incomplete")
+        tracked_path = repository / relative
+        if not tracked_path.is_file() or _sha256(tracked_path) != record.get("sha256"):
+            raise ValueError(f"C11 {key} provenance mismatch")
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, dict) or len(artifacts) != index["expected_artifact_count"]:
         raise ValueError("C11 artifact declaration count mismatch")
@@ -143,15 +190,29 @@ def verify_c11_artifact(repository: Path, index_path: Path) -> tuple[dict[str, A
     for name, count in EXPECTED_ROWS.items():
         if len(_read_csv(run_dir / name)) != count:
             raise ValueError(f"C11 row-count contract failed: {name}")
+    split_manifest = _json(run_dir / "split_manifest.json")
+    if manifest.get("split_manifest") != split_manifest:
+        raise ValueError("C11 split provenance mismatch")
     cells = _read_csv(run_dir / "enumeration_cells.csv")
     summaries = _read_csv(run_dir / "distribution_summary.csv")
-    if (
-        cells["cell_id"].nunique() != 10
-        or len(summaries.loc[summaries["status"] == "evaluated"]) != 12
-    ):
+    required_cell_columns = {"cell_id", "role", "n_cal", "alpha", "status"}
+    if not required_cell_columns.issubset(cells.columns):
+        raise ValueError("C11 cell schema is incomplete")
+    actual_cells = {
+        (str(row.cell_id), str(row.role), int(row.n_cal), float(row.alpha), str(row.status))
+        for row in cells.itertuples(index=False)
+    }
+    if actual_cells != EXPECTED_CELLS:
+        raise ValueError("C11 declared-cell contract mismatch")
+    if len(summaries.loc[summaries["status"] == "evaluated"]) != 12:
         raise ValueError("C11 evaluated-cell accounting mismatch")
     excluded = summaries.loc[summaries["status"] != "evaluated"]
-    if len(excluded) != 4 or set(excluded["reference"]) != {"not_evaluated"}:
+    if (
+        len(excluded) != 4
+        or set(excluded["reference"]) != {"not_evaluated"}
+        or set(excluded["cell_id"])
+        != {"n10_alpha_0.05", "n15_alpha_0.05", "n40_alpha_0.1", "n40_alpha_0.05"}
+    ):
         raise ValueError("C11 excluded cells are missing or misrepresented")
     observation = _json(run_dir / "observation_mechanism.json")
     if (

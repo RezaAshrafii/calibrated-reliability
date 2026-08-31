@@ -27,33 +27,54 @@ def _fixture_repository(tmp_path: Path) -> tuple[Path, Path, Path]:
     run_dir = repository / "outputs" / "c11_official" / "C11_FD001_producer_seed_13"
     run_dir.mkdir(parents=True)
 
+    cell_specs = [
+        ("n10_alpha_0.1", "primary", 10, 0.1, "evaluate"),
+        ("n15_alpha_0.1", "primary", 15, 0.1, "evaluate"),
+        ("n20_alpha_0.1", "primary", 20, 0.1, "evaluate"),
+        ("n30_alpha_0.1", "primary", 30, 0.1, "evaluate"),
+        (
+            "n10_alpha_0.05",
+            "sensitivity",
+            10,
+            0.05,
+            "not_evaluated_due_to_unattainable_finite_rank",
+        ),
+        (
+            "n15_alpha_0.05",
+            "sensitivity",
+            15,
+            0.05,
+            "not_evaluated_due_to_unattainable_finite_rank",
+        ),
+        ("n20_alpha_0.05", "sensitivity", 20, 0.05, "evaluate"),
+        ("n30_alpha_0.05", "sensitivity", 30, 0.05, "evaluate"),
+        (
+            "n40_alpha_0.1",
+            "excluded",
+            40,
+            0.1,
+            "not_evaluated_due_to_degenerate_full_reservoir_subset",
+        ),
+        (
+            "n40_alpha_0.05",
+            "excluded",
+            40,
+            0.05,
+            "not_evaluated_due_to_degenerate_full_reservoir_subset",
+        ),
+    ]
     cells = pd.DataFrame(
         [
-            {
-                "cell_id": f"evaluated_{index}",
-                "role": "primary",
-                "n_cal": 10 + index,
-                "alpha": 0.1,
-                "status": "evaluate",
-            }
-            for index in range(6)
-        ]
-        + [
-            {
-                "cell_id": f"excluded_{index}",
-                "role": "excluded",
-                "n_cal": 40,
-                "alpha": 0.05,
-                "status": "not_evaluated_due_to_unattainable_finite_rank",
-            }
-            for index in range(4)
+            {"cell_id": cell_id, "role": role, "n_cal": n_cal, "alpha": alpha, "status": status}
+            for cell_id, role, n_cal, alpha, status in cell_specs
         ]
     )
     cells.to_csv(run_dir / "enumeration_cells.csv", index=False)
+    evaluated_indices = [0, 1, 2, 3, 6, 7]
     summaries = pd.DataFrame(
         [
             {
-                "cell_id": f"evaluated_{index // 2}",
+                "cell_id": cell_specs[evaluated_indices[index // 2]][0],
                 "status": "evaluated",
                 "reference": "continuous_beta" if index % 2 == 0 else "beta_binomial",
             }
@@ -61,8 +82,8 @@ def _fixture_repository(tmp_path: Path) -> tuple[Path, Path, Path]:
         ]
         + [
             {
-                "cell_id": f"excluded_{index}",
-                "status": "not_evaluated_due_to_unattainable_finite_rank",
+                "cell_id": cell_specs[[4, 5, 8, 9][index]][0],
+                "status": cell_specs[[4, 5, 8, 9][index]][4],
                 "reference": "not_evaluated",
             }
             for index in range(4)
@@ -97,6 +118,15 @@ def _fixture_repository(tmp_path: Path) -> tuple[Path, Path, Path]:
     ):
         _write_json(run_dir / name, {"fixture": True})
     (run_dir / "run.log").write_text("fixture\n", encoding="utf-8")
+    for relative in (
+        "configs/cmapss/finite_reservoir.yaml",
+        "data/registry.yaml",
+        "uv.lock",
+        "docs/decisions/ADR-0012-c11-finite-reservoir-design.md",
+    ):
+        path = repository / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(relative + "\n", encoding="utf-8")
 
     artifact_names = sorted(path.name for path in run_dir.iterdir())
     producer = "1" * 40
@@ -104,7 +134,26 @@ def _fixture_repository(tmp_path: Path) -> tuple[Path, Path, Path]:
     manifest = {
         "experiment_id": "C11",
         "run_id": run_id,
+        "source": "FD001",
+        "target": "FD001",
+        "evaluation_unit": "engine_endpoint_finite_reservoir",
         "git": {"dirty": False, "sha": producer},
+        "configuration": {
+            "path": "configs/cmapss/finite_reservoir.yaml",
+            "sha256": _digest(repository / "configs/cmapss/finite_reservoir.yaml"),
+        },
+        "data_registry": {
+            "path": "data/registry.yaml",
+            "sha256": _digest(repository / "data/registry.yaml"),
+        },
+        "lockfile": {"path": "uv.lock", "sha256": _digest(repository / "uv.lock")},
+        "accepted_design_adr": {
+            "path": "docs/decisions/ADR-0012-c11-finite-reservoir-design.md",
+            "sha256": _digest(
+                repository / "docs/decisions/ADR-0012-c11-finite-reservoir-design.md"
+            ),
+        },
+        "split_manifest": {"fixture": True},
         "artifacts": {name: _digest(run_dir / name) for name in artifact_names},
     }
     manifest_path = run_dir / "manifest.json"
@@ -121,7 +170,7 @@ def _fixture_repository(tmp_path: Path) -> tuple[Path, Path, Path]:
         "status": "VERIFIED_CANDIDATE",
     }
     index_path = repository / "docs" / "c11_artifact_index.yaml"
-    index_path.parent.mkdir()
+    index_path.parent.mkdir(parents=True, exist_ok=True)
     index_path.write_text(yaml.safe_dump(index, sort_keys=False), encoding="utf-8")
     return repository, index_path, run_dir
 
@@ -171,6 +220,21 @@ def test_manifest_trust_anchor_and_exclusion_accounting_fail_closed(tmp_path: Pa
     index["manifest_sha256"] = _digest(run_dir / "manifest.json")
     index_path.write_text(yaml.safe_dump(index), encoding="utf-8")
     with pytest.raises(ValueError, match="row-count contract"):
+        c11_results.verify_c11_artifact(repository, index_path)
+
+
+def test_declared_cell_contract_rejects_count_correct_substitution(tmp_path: Path) -> None:
+    repository, index_path, run_dir = _fixture_repository(tmp_path)
+    cells = pd.read_csv(run_dir / "enumeration_cells.csv")
+    cells.loc[0, "cell_id"] = "substituted_cell"
+    cells.to_csv(run_dir / "enumeration_cells.csv", index=False)
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["artifacts"]["enumeration_cells.csv"] = _digest(run_dir / "enumeration_cells.csv")
+    _write_json(run_dir / "manifest.json", manifest)
+    index = yaml.safe_load(index_path.read_text(encoding="utf-8"))
+    index["manifest_sha256"] = _digest(run_dir / "manifest.json")
+    index_path.write_text(yaml.safe_dump(index), encoding="utf-8")
+    with pytest.raises(ValueError, match="declared-cell contract"):
         c11_results.verify_c11_artifact(repository, index_path)
 
 
