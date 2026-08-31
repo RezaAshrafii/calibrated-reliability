@@ -23,7 +23,7 @@ def test_active_registry_matches_reframed_scope() -> None:
         assert f"| {removed_id} |" not in registry
 
     assert "| C11 | candidate RQ2 mechanism |" in registry
-    assert "IMPLEMENTED / EXECUTED / NOT VERIFIED / NOT REPORTED" in registry
+    assert "IMPLEMENTED / EXECUTED / VERIFIED / REPORTED" in registry
     assert "MALT experiments M01--M08 are deferred and not implemented" in registry
 
 
@@ -95,7 +95,7 @@ def test_reporting_status_cannot_be_inferred_from_files() -> None:
     assert "reports/results/summary.csv" in results
     assert "they are never converted to zero" in results
     assert "the aggregate remains `PENDING`" in results
-    assert "| C11 | IMPLEMENTED | EXECUTED | NOT VERIFIED | NOT ELIGIBLE |" in results
+    assert "| C11 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED |" in results
 
 
 def test_gate_d_builder_and_artifact_index_are_the_only_reporting_path() -> None:
@@ -113,19 +113,22 @@ def test_gate_d_builder_and_artifact_index_are_the_only_reporting_path() -> None
     assert "manifest_set_sha256:" in index
 
 
-def test_c11_reporting_is_separate_and_not_reported_before_review() -> None:
+def test_c11_reporting_is_separate_and_reported_only_after_reconstruction() -> None:
     contract = _normalized("docs/C11_REPORTING.md")
     index = _read("docs/c11_artifact_index.yaml")
     results = _read("docs/RESULTS.md")
 
     assert "separate from the historical C01--C08 Gate D builder" in contract
-    assert "PUBLISHED CANDIDATE / NOT YET VERIFIED / NOT YET REPORTED" in contract
+    assert "PUBLISHED / VERIFIED / REPORTED" in contract
+    assert "aedbb67dd223d102791ec36a8823c2cff6a0521b" in contract
+    assert "is not the experiment lifecycle status" in contract
     assert "not an independent statistical reconstruction engine" in contract
-    assert "must recompute" in contract
+    assert "independently recomputed" in contract
+    assert "reproduced all five report files byte-for-byte" in contract
     assert "manifest_sha256:" in index
     assert "status: VERIFIED_CANDIDATE" in index
     assert "scripts/build_c11_results.py" not in _read("docs/RUNBOOK.md")
-    assert "| C11 | IMPLEMENTED | EXECUTED | NOT VERIFIED | NOT ELIGIBLE |" in results
+    assert "| C11 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED |" in results
 
 
 def test_gate_d_reconstruction_and_trust_anchor_are_explicit() -> None:
@@ -155,7 +158,7 @@ def test_gate_d_environment_is_exact_and_revalidated() -> None:
     assert "direct-package versions" in reproducibility
 
 
-def test_c11_accepted_design_execution_is_recorded_and_verification_remains_blocked() -> None:
+def test_c11_accepted_design_execution_and_verified_reporting_are_recorded() -> None:
     adr = _normalized("docs/decisions/ADR-0012-c11-finite-reservoir-design.md")
     readme = _normalized("README.md")
     protocol = _normalized("docs/protocol.md")
@@ -192,7 +195,7 @@ def test_c11_accepted_design_execution_is_recorded_and_verification_remains_bloc
     assert "docs/C11_EXECUTION.md" in runbook
     execution = _normalized("docs/C11_EXECUTION.md")
     assert "cba16d0477ab19bf07ec02dd4be151e6b5fb670e" in execution
-    assert "EXECUTED / NOT VERIFIED / NOT REPORTED" in execution
+    assert "IMPLEMENTED / EXECUTED / VERIFIED / REPORTED" in execution
     assert (ROOT / "configs" / "cmapss" / "finite_reservoir.yaml").is_file()
     assert (ROOT / "src" / "calibrated_reliability" / "experiments" / "c11.py").is_file()
     assert (ROOT / "scripts" / "run_c11_finite_reservoir.py").is_file()

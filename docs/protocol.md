@@ -33,8 +33,8 @@ boundary.
 RQ1 is addressed only as replication/context by C01--C04. C05--C08 are
 exploratory evidence that motivates RQ2 but does not answer it. The C11-A and
 implementation-readiness reviews passed, and the frozen C11 design was executed
-once from clean commit `cba16d0`; its artifact now awaits independent
-reconstruction before any result is verified or reported. RQ3 is a
+once from clean commit `cba16d0`; its artifact and deterministic report were
+subsequently independently reconstructed and verified. RQ3 is a
 non-deployable oracle contrast and is
 considered only after C11; it is not a novel repair method.
 
@@ -91,8 +91,9 @@ indexed verified artifacts.
 
 C11-A independently accepted ADR-0012, and a separate implementation-readiness
 review passed before the single authorized execution. One immutable local C11
-artifact now exists from clean commit `cba16d0`; its existence establishes only
-`EXECUTED`, not `VERIFIED` or `REPORTED`. The frozen FD001-only design uses one seed-13 HGB
+artifact exists from clean commit `cba16d0`. Artifact-level and report-level
+audits independently reconstructed its retained calculations, so C11 is now
+`IMPLEMENTED`, `EXECUTED`, `VERIFIED`, and `REPORTED`. The frozen FD001-only design uses one seed-13 HGB
 predictor, a disjoint 60-engine fit role and 40-engine finite
 reservoir, the exact existing `generate_cut_points` algorithm, exact
 combinatorial subset integration, six attainable size/alpha cells, continuous
@@ -108,8 +109,8 @@ descriptive audit, not confirmatory preregistration. No binary adequacy or
 material-departure classification is permitted. The completed C11-A review
 preceded configuration and production implementation; the separate
 implementation-readiness review passed before execution and official artifact
-generation. Independent artifact-level reconstruction remains mandatory before
-verification or reporting.
+generation. Independent artifact-level and report-level reconstruction were
+completed before assigning `VERIFIED` and `REPORTED`.
 
 C12 is optional and must not precede the reviewed C11 mechanism result. If
 retained, only Conditions A/B may be designed. Target calibration and evaluation

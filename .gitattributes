@@ -1,7 +1,10 @@
 .python-version text eol=lf
 uv.lock text eol=lf
+configs/cmapss/finite_reservoir.yaml text eol=lf
+data/registry.yaml text eol=lf
 docs/artifact_index.yaml text eol=lf
 docs/c11_artifact_index.yaml text eol=lf
+docs/decisions/ADR-0012-c11-finite-reservoir-design.md text eol=lf
 reports/results/*.csv text eol=lf
 reports/results/*.json text eol=lf
 reports/results/*.sha256 text eol=lf

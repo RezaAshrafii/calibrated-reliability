@@ -26,6 +26,11 @@ No research metric is manually transcribed into this Markdown file.
 - `reports/results/checksums.sha256`: detached SHA-256 checksums for every CSV
   report and `provenance.json`.
 
+The separately indexed C11 publication is under `reports/c11/`. Its cells,
+reference discrepancies, observation summary, provenance, and detached
+checksums were independently reconstructed from the retained lower-level C11
+artifact tables before C11 received `VERIFIED` and `REPORTED` status.
+
 The classical integer order-statistic rank is not applicable to C05's weighted
 pointwise threshold. Those rank fields are explicitly `PENDING` and labelled
 `not_applicable_to_weighted_quantile`; they are never converted to zero. A raw
@@ -46,7 +51,7 @@ silently reduced.
 | C06 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED | exploratory/appendix |
 | C07 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED | exploratory/appendix |
 | C08 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED | exploratory/appendix; anchor saturation diagnostic |
-| C11 | IMPLEMENTED | EXECUTED | NOT VERIFIED | NOT ELIGIBLE | candidate primary mechanism audit; artifact review pending |
+| C11 | IMPLEMENTED | EXECUTED | VERIFIED | REPORTED | candidate primary mechanism audit |
 | C12 | NOT IMPLEMENTED | NOT EXECUTED | NOT VERIFIED | NOT ELIGIBLE | optional oracle/supporting diagnostic |
 
 The lifecycle definitions are normative in `REPRODUCIBILITY.md`. `REPORTED`

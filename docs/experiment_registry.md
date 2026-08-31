@@ -5,7 +5,8 @@
 The lifecycle terms are cumulative and use the operational definitions in
 `REPRODUCIBILITY.md`. In particular, `VERIFIED` requires matching hashes and
 provenance plus independent metric reconstruction. `REPORTED` requires the
-tracked Gate D results builder; it cannot be inferred from local output files.
+applicable tracked deterministic results builder; it cannot be inferred from
+local output files.
 
 ## Active completed experiments
 
@@ -21,18 +22,20 @@ tracked Gate D results builder; it cannot be inferred from local output files.
 | C08 | RQ2 anchor diagnostic | Prequential ACI | FD001 -> FD001/2/3/4 | prequential engine endpoint | .10,.05 | 13,37,73,101,137 | `configs/cmapss/adaptive_conformal.yaml` | IMPLEMENTED / EXECUTED / VERIFIED / REPORTED | exploratory/appendix |
 
 Every C01--C08 row is `REPORTED` through the tracked Gate D artifact index and
-deterministic builder. This status does not extend to C11 or C12.
+deterministic builder. C11 uses its separate tracked artifact index and report
+builder. This status does not extend to C12.
 
-## Executed candidate experiment awaiting artifact verification
+## Verified and reported candidate experiment
 
 | ID | Role | Method | Source -> target | Unit | Alpha | Seed | Config | Lifecycle | Reporting class |
 |---|---|---|---|---|---|---|---|---|---|
-| C11 | candidate RQ2 mechanism | Exact finite-reservoir conformal audit | FD001 -> FD001 | engine endpoint finite reservoir | .10,.05 | 13 | `configs/cmapss/finite_reservoir.yaml` | IMPLEMENTED / EXECUTED / NOT VERIFIED / NOT REPORTED | candidate primary mechanism audit |
+| C11 | candidate RQ2 mechanism | Exact finite-reservoir conformal audit | FD001 -> FD001 | engine endpoint finite reservoir | .10,.05 | 13 | `configs/cmapss/finite_reservoir.yaml` | IMPLEMENTED / EXECUTED / VERIFIED / REPORTED | candidate primary mechanism audit |
 
 C11-A accepted the narrow, retrospectively motivated and prospectively frozen
 descriptive design. The implementation-readiness review passed before the one
 authorized execution from clean commit `cba16d0`. The resulting immutable local
-artifact is awaiting independent reconstruction and is not yet reportable.
+artifact and its deterministic report were independently reconstructed and
+verified before C11 received `VERIFIED` and `REPORTED` status.
 
 ## Candidate future work
 

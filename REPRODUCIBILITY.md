@@ -19,10 +19,11 @@ split manifests, predictions, and metrics can be traced together.
 
 C01--C08 are `IMPLEMENTED`, `EXECUTED`, `VERIFIED`, and `REPORTED`. Gate D uses
 `docs/artifact_index.yaml` and `scripts/build_results.py` as the only allowed
-numerical reporting path. C11 is implemented and executed once from clean
-commit `cba16d0`, but remains unverified and ineligible for reporting pending
-independent artifact reconstruction. C12 is not implemented and is also
-ineligible for reporting.
+numerical reporting path for those experiments. C11 is also `IMPLEMENTED`,
+`EXECUTED`, `VERIFIED`, and `REPORTED`: it was executed once from clean commit
+`cba16d0`, published through the separate tracked C11 builder, and independently
+reconstructed from its retained lower-level artifact tables. C12 is not
+implemented and remains ineligible for reporting.
 
 ## Reproduction contract
 
@@ -44,6 +45,7 @@ ineligible for reporting.
    splits, predictions, and recomputed metrics before assigning `VERIFIED`.
 10. Use only the Gate D tables under `reports/results/` for C01--C08 numerical
     reporting; do not transcribe values from notebooks, audit prose, or memory.
+    Use only the tracked tables under `reports/c11/` for C11 reporting.
 11. Treat the tracked manifest-set digests and exact official run contracts in
     `docs/artifact_index.yaml` as the Gate D artifact-identity trust anchor.
 12. For byte-identical report reconstruction, use the clean builder revision
@@ -52,6 +54,12 @@ ineligible for reporting.
     `checksums.sha256`. A later builder revision or different environment must
     identify itself and therefore changes provenance even when numerical CSV
     values are scientifically equivalent.
+13. Exact historical reconstruction of the C11 report requires clean builder
+    commit `66180029e55a2b05b3b9495ed87a50318038d712`. On a Windows checkout of that
+    historical commit, use `git -c core.autocrlf=false` so the byte hashes of
+    the tracked C11 configuration, registry, and ADR provenance inputs remain
+    identical. Current revisions additionally force LF for those files through
+    `.gitattributes`.
 
 Raw data and generated outputs are intentionally excluded from Git. Their
 absence from a clean clone means local data and artifact verification is not a

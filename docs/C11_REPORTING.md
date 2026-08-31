@@ -2,7 +2,13 @@
 
 ## Status
 
-`PUBLISHED CANDIDATE / NOT YET VERIFIED / NOT YET REPORTED`
+`PUBLISHED / VERIFIED / REPORTED`
+
+The immutable report was published in commit
+`aedbb67dd223d102791ec36a8823c2cff6a0521b` from clean builder commit
+`66180029e55a2b05b3b9495ed87a50318038d712`. The artifact index status
+`VERIFIED_CANDIDATE` identifies the single artifact selected for this isolated
+reporting path; it is not the experiment lifecycle status.
 
 The C11 reporting path is deliberately separate from the historical C01--C08
 Gate D builder. It consumes only the single immutable run identified by
@@ -28,10 +34,14 @@ The immutable report contains:
 The builder requires a clean worktree, derives its own Git revision, validates
 the artifact both before construction and immediately before atomic
 publication, refuses overwrite, and cleans its temporary directory after any
-failure. Publishing these files does not by itself authorize a scientific
-claim. C11 becomes `REPORTED` only after an independent report-level audit.
+failure. Publication alone did not establish verification: the subsequent
+independent report-level audit reconstructed the retained values before C11 was
+assigned `VERIFIED` and `REPORTED`.
 
 The builder publishes the verified retained C11 tables; it is not an
-independent statistical reconstruction engine. The mandatory report-level
-audit must recompute the finite-reservoir summaries and all discrepancies from
-the retained lower-level artifact tables before C11 can become `REPORTED`.
+independent statistical reconstruction engine. The completed report-level audit
+independently recomputed finite-reservoir endpoint metrics, both reference
+distributions, all discrepancies, and the observation-mechanism distance from
+the retained lower-level artifact tables within the frozen numerical
+tolerances. It also reproduced all five report files byte-for-byte from clean
+builder commit `66180029e55a2b05b3b9495ed87a50318038d712`.

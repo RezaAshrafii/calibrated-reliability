@@ -2,7 +2,7 @@
 
 ## Status
 
-`IMPLEMENTED / EXECUTED / NOT VERIFIED / NOT REPORTED`
+`IMPLEMENTED / EXECUTED / VERIFIED / REPORTED`
 
 The C11-A design review and implementation-readiness review both passed before
 execution. C11 was then executed exactly once from the clean synchronized
@@ -29,11 +29,11 @@ uv run python scripts/run_c11_finite_reservoir.py \
 ```
 
 The runner validated all three registered FD001 inputs before and after
-computation and published one immutable run. This record does not assign
-`VERIFIED` or `REPORTED`: an independent artifact-level audit must validate the
-manifest, all declared hashes, data roles, exact multiplicities, retained
-distributions, references, discrepancies, observation diagnostic, and
-reconstruction determinism before either status may change.
+computation and published one immutable run. Subsequent independent
+artifact-level and report-level audits validated the manifest, all declared
+hashes, data roles, exact multiplicities, retained distributions, references,
+discrepancies, observation diagnostic, and deterministic report reconstruction
+before assigning `VERIFIED` and `REPORTED`.
 
-C12 remains blocked and optional. No C11 numerical value may be promoted into a
-research conclusion before the artifact-level review passes.
+C12 remains blocked and optional. C11 verification does not automatically
+authorize C12 or expand the benchmark-specific claim boundary.

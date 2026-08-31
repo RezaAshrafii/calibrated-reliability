@@ -48,8 +48,9 @@ an undeclared sensitivity condition.
   diagnostics.
 - The single authorized C11 execution is recorded in `docs/C11_EXECUTION.md`.
   Preserve that output unchanged and do not overwrite or silently rerun it.
-  C11 remains unverified and unreportable until its artifact-level review
-  passes. C12 is not implemented and has no authorized command.
+  Its artifact and report passed independent reconstruction; C11 is now
+  `VERIFIED` and `REPORTED`. C12 is not implemented and has no authorized
+  command.
 
 ## Deterministic reporting
 
@@ -73,3 +74,14 @@ SHAs within one official tree, a manifest-set digest mismatch, nested manifest,
 path traversal, and every manifest or artifact hash mismatch. Git state,
 environment, and official artifacts are revalidated immediately before final
 publication.
+
+The canonical C11 publication is under `reports/c11/` and must not be
+overwritten. Exact reconstruction of all C11 report files requires the recorded
+clean builder commit `66180029e55a2b05b3b9495ed87a50318038d712` and its exact
+environment. Because that historical commit predates the LF rules for three
+C11 provenance inputs, create a Windows historical checkout with
+`git -c core.autocrlf=false worktree add --detach <path> 66180029e55a2b05b3b9495ed87a50318038d712`.
+Build into a fresh external destination, expose the existing immutable C11
+artifact read-only, and compare every generated file with
+`reports/c11/checksums.sha256`. Current commits force LF for the C11 config,
+registry, ADR, index, and reports through `.gitattributes`.

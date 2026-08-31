@@ -11,24 +11,23 @@ distribution shift using turbofan remaining-useful-life (RUL) prediction.
 
 ## Status
 
-**Implemented, executed, independently verified, and deterministically reported:** C01--C08. These runs
+**Implemented, executed, independently verified, and deterministically reported:** C01--C08 and C11. The C01--C08 runs
 provide replication/context (C01--C04) and exploratory/appendix evidence
 (C05--C08); they are not presented as new conformal methods.
 
-**Current gate:** independent C11 artifact-level verification. C11-A and the
-implementation-readiness review passed, and the frozen design was executed
-exactly once from clean commit `cba16d0`; it is not yet independently verified
-or reportable. Gate N returned `REFRAME`: the surviving scientific scope is a narrow
+**Core study status:** complete. C11-A and the implementation-readiness review
+passed, the frozen design was executed exactly once from clean commit
+`cba16d0`, and its immutable artifact and deterministic report were independently
+reconstructed and verified. Gate N returned `REFRAME`: the surviving scientific scope is a narrow
 application-level audit of engine-level conformal rank attainability and
 resolution, compared with the exact Beta reference and interpreted alongside
 the C-MAPSS observation mechanism. C11 is retrospectively motivated by the
 completed outcomes and prospectively frozen only before its own computation;
 it is a descriptive audit, not confirmatory preregistration.
 
-**Implemented and executed, awaiting independent artifact review:** C11. Its
-immutable local artifact remains ineligible for reporting until provenance,
-hashes, and all retained calculations pass independent reconstruction. **Not
-implemented:** C12. C12 is optional, oracle-only supporting
+**Verified and reported:** C11. Its report under `reports/c11/` is tied to the
+single immutable artifact and was independently reconstructed from retained
+lower-level tables. **Not implemented:** C12. C12 is optional, oracle-only supporting
 diagnostics and cannot precede C11. MALT, C12-D, N-CMAPSS expansion, new deep
 models, and dashboard work are deferred outside the current core study.
 
@@ -80,7 +79,8 @@ and reporting state live in [docs/protocol.md](docs/protocol.md),
 [docs/NOVELTY_MATRIX.md](docs/NOVELTY_MATRIX.md), and
 [docs/RESULTS.md](docs/RESULTS.md). The tracked Gate D builder validates the
 official artifact index and reconstructs the C01--C08 tables without manual
-transcription. C11 and C12 remain ineligible for numerical reporting.
+transcription. The separate tracked C11 reporting path publishes only the
+verified C11 artifact. C12 remains ineligible for numerical reporting.
 
 ## Citation
 
