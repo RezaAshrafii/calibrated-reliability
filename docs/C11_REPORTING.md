@@ -30,3 +30,8 @@ the artifact both before construction and immediately before atomic
 publication, refuses overwrite, and cleans its temporary directory after any
 failure. Publishing these files does not by itself authorize a scientific
 claim. C11 becomes `REPORTED` only after an independent report-level audit.
+
+The builder publishes the verified retained C11 tables; it is not an
+independent statistical reconstruction engine. The mandatory report-level
+audit must recompute the finite-reservoir summaries and all discrepancies from
+the retained lower-level artifact tables before C11 can become `REPORTED`.

@@ -120,6 +120,8 @@ def test_c11_reporting_is_separate_and_not_published_before_review() -> None:
 
     assert "separate from the historical C01--C08 Gate D builder" in contract
     assert "NOT YET PUBLISHED / NOT YET REPORTED" in contract
+    assert "not an independent statistical reconstruction engine" in contract
+    assert "must recompute" in contract
     assert "manifest_sha256:" in index
     assert "status: VERIFIED_CANDIDATE" in index
     assert "scripts/build_c11_results.py" not in _read("docs/RUNBOOK.md")

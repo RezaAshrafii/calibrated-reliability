@@ -15,6 +15,9 @@ from typing import Any, cast
 import pandas as pd
 import yaml
 
+from calibrated_reliability.data.splitting import split_engine_ids
+from calibrated_reliability.experiments.c11 import C11Config
+
 INDEX_FIELDS = {
     "schema_version",
     "index_id",
@@ -35,6 +38,14 @@ EXPECTED_ROWS = {
     "beta_binomial_distribution.csv": 606,
     "reservoir_scores.csv": 40,
     "evaluation_scores.csv": 100,
+}
+EXPECTED_ARTIFACTS = {
+    *EXPECTED_ROWS,
+    "observation_mechanism.json",
+    "reference_summary.json",
+    "resolved_config.json",
+    "run.log",
+    "split_manifest.json",
 }
 EXPECTED_CELLS = {
     ("n10_alpha_0.1", "primary", 10, 0.1, "evaluate"),
@@ -100,21 +111,23 @@ def _load_index(index_path: Path) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != INDEX_FIELDS:
         raise ValueError("C11 artifact index fields differ from schema version 1")
     index = cast(dict[str, Any], value)
-    if index["schema_version"] != 1 or index["experiment_id"] != "C11":
+    string_fields = INDEX_FIELDS - {"schema_version", "expected_artifact_count"}
+    if any(type(index[field]) is not str for field in string_fields):
+        raise ValueError("C11 artifact index string fields must not be coerced")
+    if type(index["schema_version"]) is not int or index["schema_version"] != 1:
+        raise ValueError("Unsupported C11 artifact-index schema version")
+    if index["experiment_id"] != "C11":
         raise ValueError("Unsupported C11 artifact index")
     if index["status"] != "VERIFIED_CANDIDATE":
         raise ValueError("C11 artifact must remain a verified candidate until report audit")
-    if (
-        isinstance(index["expected_artifact_count"], bool)
-        or index["expected_artifact_count"] != 11
-    ):
+    if type(index["expected_artifact_count"]) is not int or index["expected_artifact_count"] != 11:
         raise ValueError("C11 expected artifact count must be the integer 11")
-    if DIGEST_RE.fullmatch(str(index["manifest_sha256"])) is None:
+    if DIGEST_RE.fullmatch(index["manifest_sha256"]) is None:
         raise ValueError("C11 manifest SHA-256 is malformed")
-    if SHA_RE.fullmatch(str(index["producing_git_sha"])) is None:
+    if SHA_RE.fullmatch(index["producing_git_sha"]) is None:
         raise ValueError("C11 producing Git SHA is malformed")
-    root = PurePosixPath(str(index["artifact_root"]))
-    run = PurePosixPath(str(index["run_directory"]))
+    root = PurePosixPath(index["artifact_root"])
+    run = PurePosixPath(index["run_directory"])
     if root.is_absolute() or root.parts[:1] != ("outputs",) or len(root.parts) != 2:
         raise ValueError("C11 artifact root must be one top-level outputs directory")
     if run.is_absolute() or len(run.parts) != 1 or run.name in {".", ".."}:
@@ -153,6 +166,7 @@ def verify_c11_artifact(repository: Path, index_path: Path) -> tuple[dict[str, A
         raise ValueError("C11 configuration path is not frozen")
     if not config_path.is_file() or _sha256(config_path) != config["sha256"]:
         raise ValueError("C11 configuration provenance mismatch")
+    frozen_config = C11Config.from_yaml(config_path.read_text(encoding="utf-8")).as_dict()
     for key, relative in (
         ("data_registry", "data/registry.yaml"),
         ("lockfile", "uv.lock"),
@@ -164,10 +178,49 @@ def verify_c11_artifact(repository: Path, index_path: Path) -> tuple[dict[str, A
         tracked_path = repository / relative
         if not tracked_path.is_file() or _sha256(tracked_path) != record.get("sha256"):
             raise ValueError(f"C11 {key} provenance mismatch")
+    resolved_config = _json(run_dir / "resolved_config.json")
+    if resolved_config != frozen_config:
+        raise ValueError("C11 resolved configuration differs from the frozen design")
+    manifest_contract = {
+        "predictor_seed": frozen_config["predictor_seed"],
+        "split_seed": frozen_config["split_seed"],
+        "cut_point_seed": frozen_config["cut_point_seed"],
+        "rul_cap": frozen_config["rul_cap"],
+        "model": frozen_config["model"],
+        "declared_cells": frozen_config["cells"],
+        "exact_distribution": frozen_config["exact_distribution"],
+        "references": frozen_config["references"],
+        "discrepancies": frozen_config["discrepancies"],
+        "observation_diagnostic": frozen_config["observation_diagnostic"],
+    }
+    for key, expected in manifest_contract.items():
+        if manifest.get(key) != expected:
+            raise ValueError(f"C11 manifest {key} differs from the frozen design")
+    registry = yaml.safe_load((repository / "data/registry.yaml").read_text(encoding="utf-8"))
+    if not isinstance(registry, dict) or not isinstance(registry.get("files"), list):
+        raise ValueError("C11 data registry schema is malformed")
+    registered = {
+        item.get("filename"): item for item in registry["files"] if isinstance(item, dict)
+    }
+    expected_data: dict[str, dict[str, Any]] = {}
+    for filename in ("train_FD001.txt", "test_FD001.txt", "RUL_FD001.txt"):
+        item = registered.get(filename)
+        if not isinstance(item, dict):
+            raise ValueError(f"C11 registry entry is missing: {filename}")
+        expected_data[filename] = {
+            "bytes": item.get("expected_bytes"),
+            "rows": item.get("expected_rows"),
+            "engines": item.get("expected_engines"),
+            "sha256": item.get("sha256"),
+        }
+    if manifest.get("data") != expected_data:
+        raise ValueError("C11 data provenance differs from the tracked registry")
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, dict) or len(artifacts) != index["expected_artifact_count"]:
         raise ValueError("C11 artifact declaration count mismatch")
     declared = cast(dict[str, Any], artifacts)
+    if set(declared) != EXPECTED_ARTIFACTS:
+        raise ValueError("C11 artifact schema differs from the frozen report contract")
     expected_files = {"manifest.json", *declared}
     actual_files = {path.name for path in run_dir.iterdir() if path.is_file()}
     if actual_files != expected_files or any(path.is_dir() for path in run_dir.iterdir()):
@@ -193,6 +246,18 @@ def verify_c11_artifact(repository: Path, index_path: Path) -> tuple[dict[str, A
     split_manifest = _json(run_dir / "split_manifest.json")
     if manifest.get("split_manifest") != split_manifest:
         raise ValueError("C11 split provenance mismatch")
+    expected_split = split_engine_ids(list(range(1, 101)), seed=13)
+    frozen_split = {
+        "seed": 13,
+        "predictor_fit_engine_ids": expected_split["base_train"],
+        "former_calibration_engine_ids": expected_split["calibration"],
+        "former_validation_engine_ids": expected_split["validation"],
+        "reservoir_engine_ids": sorted(
+            expected_split["calibration"] + expected_split["validation"]
+        ),
+    }
+    if split_manifest != frozen_split:
+        raise ValueError("C11 split roles differ from the frozen seed-13 partition")
     cells = _read_csv(run_dir / "enumeration_cells.csv")
     summaries = _read_csv(run_dir / "distribution_summary.csv")
     required_cell_columns = {"cell_id", "role", "n_cal", "alpha", "status"}

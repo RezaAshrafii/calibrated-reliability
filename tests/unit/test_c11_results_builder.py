@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 import yaml
 
+from calibrated_reliability.data.splitting import split_engine_ids
 from calibrated_reliability.reporting import c11_results
 
 
@@ -22,10 +23,20 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
     path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
 
+def _reanchor_manifest(index_path: Path, manifest_path: Path) -> None:
+    index = yaml.safe_load(index_path.read_text(encoding="utf-8"))
+    index["manifest_sha256"] = _digest(manifest_path)
+    index_path.write_text(yaml.safe_dump(index, sort_keys=False), encoding="utf-8")
+
+
 def _fixture_repository(tmp_path: Path) -> tuple[Path, Path, Path]:
     repository = tmp_path / "repository"
     run_dir = repository / "outputs" / "c11_official" / "C11_FD001_producer_seed_13"
     run_dir.mkdir(parents=True)
+    project_root = Path(__file__).resolve().parents[2]
+    frozen_config = yaml.safe_load(
+        (project_root / "configs/cmapss/finite_reservoir.yaml").read_text(encoding="utf-8")
+    )
 
     cell_specs = [
         ("n10_alpha_0.1", "primary", 10, 0.1, "evaluate"),
@@ -111,19 +122,53 @@ def _fixture_repository(tmp_path: Path) -> tuple[Path, Path, Path]:
             "reservoir_residual_tied_rows": 0,
         },
     )
-    for name in (
-        "split_manifest.json",
-        "reference_summary.json",
-        "resolved_config.json",
-    ):
-        _write_json(run_dir / name, {"fixture": True})
+    split = split_engine_ids(list(range(1, 101)), seed=13)
+    split_manifest = {
+        "seed": 13,
+        "predictor_fit_engine_ids": split["base_train"],
+        "former_calibration_engine_ids": split["calibration"],
+        "former_validation_engine_ids": split["validation"],
+        "reservoir_engine_ids": sorted(split["calibration"] + split["validation"]),
+    }
+    _write_json(run_dir / "split_manifest.json", split_manifest)
+    _write_json(run_dir / "reference_summary.json", {"fixture": True})
+    _write_json(run_dir / "resolved_config.json", frozen_config)
     (run_dir / "run.log").write_text("fixture\n", encoding="utf-8")
-    for relative in (
-        "configs/cmapss/finite_reservoir.yaml",
-        "data/registry.yaml",
-        "uv.lock",
-        "docs/decisions/ADR-0012-c11-finite-reservoir-design.md",
+    config_path = repository / "configs/cmapss/finite_reservoir.yaml"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(
+        (project_root / "configs/cmapss/finite_reservoir.yaml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    registry_files = []
+    manifest_data = {}
+    for filename, expected_bytes, expected_rows, expected_engines, digest in (
+        ("train_FD001.txt", 10, 100, 100, "a" * 64),
+        ("test_FD001.txt", 20, 100, 100, "b" * 64),
+        ("RUL_FD001.txt", 30, 100, None, "c" * 64),
     ):
+        registry_files.append(
+            {
+                "filename": filename,
+                "kind": "rul" if filename.startswith("RUL") else "cmapss",
+                "expected_bytes": expected_bytes,
+                "expected_rows": expected_rows,
+                "expected_engines": expected_engines,
+                "sha256": digest,
+            }
+        )
+        manifest_data[filename] = {
+            "bytes": expected_bytes,
+            "rows": expected_rows,
+            "engines": expected_engines,
+            "sha256": digest,
+        }
+    registry_path = repository / "data/registry.yaml"
+    registry_path.parent.mkdir(parents=True)
+    registry_path.write_text(
+        yaml.safe_dump({"version": 1, "files": registry_files}, sort_keys=False), encoding="utf-8"
+    )
+    for relative in ("uv.lock", "docs/decisions/ADR-0012-c11-finite-reservoir-design.md"):
         path = repository / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(relative + "\n", encoding="utf-8")
@@ -138,6 +183,17 @@ def _fixture_repository(tmp_path: Path) -> tuple[Path, Path, Path]:
         "target": "FD001",
         "evaluation_unit": "engine_endpoint_finite_reservoir",
         "git": {"dirty": False, "sha": producer},
+        "predictor_seed": frozen_config["predictor_seed"],
+        "split_seed": frozen_config["split_seed"],
+        "cut_point_seed": frozen_config["cut_point_seed"],
+        "rul_cap": frozen_config["rul_cap"],
+        "model": frozen_config["model"],
+        "declared_cells": frozen_config["cells"],
+        "exact_distribution": frozen_config["exact_distribution"],
+        "references": frozen_config["references"],
+        "discrepancies": frozen_config["discrepancies"],
+        "observation_diagnostic": frozen_config["observation_diagnostic"],
+        "data": manifest_data,
         "configuration": {
             "path": "configs/cmapss/finite_reservoir.yaml",
             "sha256": _digest(repository / "configs/cmapss/finite_reservoir.yaml"),
@@ -153,7 +209,7 @@ def _fixture_repository(tmp_path: Path) -> tuple[Path, Path, Path]:
                 repository / "docs/decisions/ADR-0012-c11-finite-reservoir-design.md"
             ),
         },
-        "split_manifest": {"fixture": True},
+        "split_manifest": split_manifest,
         "artifacts": {name: _digest(run_dir / name) for name in artifact_names},
     }
     manifest_path = run_dir / "manifest.json"
@@ -236,6 +292,74 @@ def test_declared_cell_contract_rejects_count_correct_substitution(tmp_path: Pat
     index_path.write_text(yaml.safe_dump(index), encoding="utf-8")
     with pytest.raises(ValueError, match="declared-cell contract"):
         c11_results.verify_c11_artifact(repository, index_path)
+
+
+def test_resolved_config_manifest_and_split_semantics_fail_closed(tmp_path: Path) -> None:
+    repository, index_path, run_dir = _fixture_repository(tmp_path)
+    resolved_path = run_dir / "resolved_config.json"
+    resolved = json.loads(resolved_path.read_text(encoding="utf-8"))
+    resolved["rul_cap"] = 124
+    _write_json(resolved_path, resolved)
+    manifest_path = run_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifacts"][resolved_path.name] = _digest(resolved_path)
+    _write_json(manifest_path, manifest)
+    _reanchor_manifest(index_path, manifest_path)
+    with pytest.raises(ValueError, match="resolved configuration"):
+        c11_results.verify_c11_artifact(repository, index_path)
+
+    repository, index_path, run_dir = _fixture_repository(tmp_path / "manifest")
+    manifest_path = run_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["model"]["max_iter"] = 51
+    _write_json(manifest_path, manifest)
+    _reanchor_manifest(index_path, manifest_path)
+    with pytest.raises(ValueError, match="manifest model"):
+        c11_results.verify_c11_artifact(repository, index_path)
+
+    repository, index_path, run_dir = _fixture_repository(tmp_path / "split")
+    split_path = run_dir / "split_manifest.json"
+    split = json.loads(split_path.read_text(encoding="utf-8"))
+    split["predictor_fit_engine_ids"][0] = 2
+    _write_json(split_path, split)
+    manifest_path = run_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["split_manifest"] = split
+    manifest["artifacts"][split_path.name] = _digest(split_path)
+    _write_json(manifest_path, manifest)
+    _reanchor_manifest(index_path, manifest_path)
+    with pytest.raises(ValueError, match="split roles"):
+        c11_results.verify_c11_artifact(repository, index_path)
+
+
+def test_index_types_and_data_provenance_fail_closed(tmp_path: Path) -> None:
+    repository, index_path, run_dir = _fixture_repository(tmp_path)
+    index = yaml.safe_load(index_path.read_text(encoding="utf-8"))
+    index["run_directory"] = 13
+    index_path.write_text(yaml.safe_dump(index), encoding="utf-8")
+    with pytest.raises(ValueError, match="must not be coerced"):
+        c11_results.verify_c11_artifact(repository, index_path)
+
+    repository, index_path, run_dir = _fixture_repository(tmp_path / "data")
+    manifest_path = run_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["data"]["RUL_FD001.txt"]["rows"] = 99
+    _write_json(manifest_path, manifest)
+    _reanchor_manifest(index_path, manifest_path)
+    with pytest.raises(ValueError, match="data provenance"):
+        c11_results.verify_c11_artifact(repository, index_path)
+
+
+def test_tracked_index_verifies_real_candidate_when_available() -> None:
+    repository = Path(__file__).resolve().parents[2]
+    index_path = repository / "docs/c11_artifact_index.yaml"
+    index = yaml.safe_load(index_path.read_text(encoding="utf-8"))
+    run_dir = repository / index["artifact_root"] / index["run_directory"]
+    if not run_dir.is_dir():
+        pytest.skip("ignored C11 candidate artifact is unavailable in this checkout")
+    manifest, verified_dir = c11_results.verify_c11_artifact(repository, index_path)
+    assert verified_dir == run_dir
+    assert manifest["git"] == {"dirty": False, "sha": index["producing_git_sha"]}
 
 
 def test_overwrite_and_final_revalidation_fail_without_partial_output(
