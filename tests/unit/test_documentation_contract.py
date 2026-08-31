@@ -113,6 +113,19 @@ def test_gate_d_builder_and_artifact_index_are_the_only_reporting_path() -> None
     assert "manifest_set_sha256:" in index
 
 
+def test_c11_reporting_is_separate_and_not_published_before_review() -> None:
+    contract = _normalized("docs/C11_REPORTING.md")
+    index = _read("docs/c11_artifact_index.yaml")
+    results = _read("docs/RESULTS.md")
+
+    assert "separate from the historical C01--C08 Gate D builder" in contract
+    assert "NOT YET PUBLISHED / NOT YET REPORTED" in contract
+    assert "manifest_sha256:" in index
+    assert "status: VERIFIED_CANDIDATE" in index
+    assert "scripts/build_c11_results.py" not in _read("docs/RUNBOOK.md")
+    assert "| C11 | IMPLEMENTED | EXECUTED | NOT VERIFIED | NOT ELIGIBLE |" in results
+
+
 def test_gate_d_reconstruction_and_trust_anchor_are_explicit() -> None:
     runbook = _normalized("docs/RUNBOOK.md")
     results = _normalized("docs/RESULTS.md")

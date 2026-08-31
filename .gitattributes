@@ -1,6 +1,10 @@
 .python-version text eol=lf
 uv.lock text eol=lf
 docs/artifact_index.yaml text eol=lf
+docs/c11_artifact_index.yaml text eol=lf
 reports/results/*.csv text eol=lf
 reports/results/*.json text eol=lf
 reports/results/*.sha256 text eol=lf
+reports/c11/*.csv text eol=lf
+reports/c11/*.json text eol=lf
+reports/c11/*.sha256 text eol=lf

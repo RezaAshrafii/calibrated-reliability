@@ -1,0 +1,9 @@
+schema_version: 1
+index_id: c11_verified_artifact_candidate
+experiment_id: C11
+artifact_root: outputs/c11_final_cba16d0
+run_directory: C11_FD001_cba16d0477ab_seed_13
+manifest_sha256: 5898f94018da19d54a376ecdaccafddb5092a8312b7633a9a2760f241014055b
+producing_git_sha: cba16d0477ab19bf07ec02dd4be151e6b5fb670e
+expected_artifact_count: 11
+status: VERIFIED_CANDIDATE
