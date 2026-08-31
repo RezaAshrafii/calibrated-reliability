@@ -324,7 +324,10 @@ def build_c11_results(repository: Path, index_path: Path, destination: Path) -> 
     manifest, run_dir = verify_c11_artifact(repository, index_path)
     if destination.exists():
         raise FileExistsError(f"C11 report destination already exists: {destination}")
-    temp_dir = Path(tempfile.mkdtemp(prefix=f".{destination.name}.tmp-", dir=destination.parent))
+    # Keep the staging directory outside the repository so its existence cannot
+    # make the clean-worktree revalidation fail.  The final rename remains
+    # atomic on the supported local filesystem.
+    temp_dir = Path(tempfile.mkdtemp(prefix=f"{destination.name}.tmp-"))
     try:
         cells = _read_csv(run_dir / "enumeration_cells.csv")
         summaries = _read_csv(run_dir / "distribution_summary.csv")
