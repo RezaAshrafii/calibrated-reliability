@@ -257,6 +257,21 @@ def test_verified_candidate_build_is_deterministic_and_preserves_exclusions(
     assert provenance["producing_git_sha"] == "1" * 40
 
 
+def test_repository_relative_cli_paths_are_normalized(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, _, _ = _fixture_repository(tmp_path)
+    monkeypatch.setattr(c11_results, "_git_state", lambda _: ("2" * 40, False))
+    destination = c11_results.build_c11_results(
+        repository,
+        Path("docs/c11_artifact_index.yaml"),
+        Path("relative-report"),
+    )
+    assert destination == repository / "relative-report"
+    provenance = json.loads((destination / "provenance.json").read_text(encoding="utf-8"))
+    assert provenance["artifact_index"]["path"] == "docs/c11_artifact_index.yaml"
+
+
 def test_manifest_trust_anchor_and_exclusion_accounting_fail_closed(tmp_path: Path) -> None:
     repository, index_path, run_dir = _fixture_repository(tmp_path)
     index = yaml.safe_load(index_path.read_text(encoding="utf-8"))

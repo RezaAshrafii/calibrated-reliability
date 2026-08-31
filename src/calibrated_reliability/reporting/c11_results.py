@@ -141,6 +141,16 @@ def _read_csv(path: Path) -> pd.DataFrame:
 
 def verify_c11_artifact(repository: Path, index_path: Path) -> tuple[dict[str, Any], Path]:
     """Verify the externally anchored C11 run and its reporting inputs."""
+    repository = repository.resolve()
+    index_path = (
+        (repository / index_path).resolve()
+        if not index_path.is_absolute()
+        else index_path.resolve()
+    )
+    try:
+        index_path.relative_to(repository)
+    except ValueError as error:
+        raise ValueError("C11 artifact index must be inside the repository") from error
     index = _load_index(index_path)
     run_dir = repository / str(index["artifact_root"]) / str(index["run_directory"])
     manifest_path = run_dir / "manifest.json"
@@ -297,6 +307,17 @@ def _write_csv(path: Path, rows: list[dict[str, Any]], fields: list[str]) -> Non
 
 def build_c11_results(repository: Path, index_path: Path, destination: Path) -> Path:
     """Publish immutable C11 report tables from the verified-candidate artifact."""
+    repository = repository.resolve()
+    index_path = (
+        (repository / index_path).resolve()
+        if not index_path.is_absolute()
+        else index_path.resolve()
+    )
+    destination = (
+        (repository / destination).resolve()
+        if not destination.is_absolute()
+        else destination.resolve()
+    )
     initial_sha, dirty = _git_state(repository)
     if dirty:
         raise RuntimeError("C11 reporting requires a clean Git worktree")
