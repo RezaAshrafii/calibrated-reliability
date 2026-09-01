@@ -119,7 +119,7 @@ def _load_index(index_path: Path) -> dict[str, Any]:
     if index["experiment_id"] != "C11":
         raise ValueError("Unsupported C11 artifact index")
     if index["status"] != "VERIFIED_CANDIDATE":
-        raise ValueError("C11 artifact must remain a verified candidate until report audit")
+        raise ValueError("C11 artifact index must use the frozen VERIFIED_CANDIDATE selector")
     if type(index["expected_artifact_count"]) is not int or index["expected_artifact_count"] != 11:
         raise ValueError("C11 expected artifact count must be the integer 11")
     if DIGEST_RE.fullmatch(index["manifest_sha256"]) is None:
@@ -133,6 +133,11 @@ def _load_index(index_path: Path) -> dict[str, Any]:
     if run.is_absolute() or len(run.parts) != 1 or run.name in {".", ".."}:
         raise ValueError("C11 run directory must be a direct child name")
     return index
+
+
+def indexed_artifact_root(index_path: Path) -> str:
+    """Return the strictly validated top-level output root for the C11 index."""
+    return str(_load_index(index_path)["artifact_root"])
 
 
 def _read_csv(path: Path) -> pd.DataFrame:

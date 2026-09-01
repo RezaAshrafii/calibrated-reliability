@@ -1,8 +1,15 @@
 # Artifact index policy
 
 The canonical machine-readable index is `docs/artifact_index.yaml`. It lists
-every local top-level tree under `outputs/` and classifies it as `OFFICIAL` or
-`SUPERSEDED`. An unindexed tree is an error, not an implicit candidate result.
+every C01--C08 local top-level tree under `outputs/` and classifies it as
+`OFFICIAL` or `SUPERSEDED`. An unindexed C01--C08 tree is an error, not an
+implicit candidate result.
+
+C11 uses the separate, strict `docs/c11_artifact_index.yaml` because it has a
+different single-run schema and reporting path. Gate D never consumes C11
+rows, but its inventory validator permits a co-located C11 root only when that
+separate index and the immutable C11 artifact both verify. Any other unindexed
+tree remains an error.
 
 The tracked index is also the trust anchor for artifact identity. For every
 indexed tree, `manifest_set_sha256` hashes the sorted sequence

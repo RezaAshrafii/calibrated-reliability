@@ -54,12 +54,16 @@ Raw data belongs in `data/raw/` and is intentionally ignored by Git. See
 `docs/protocol.md`, `REPRODUCIBILITY.md`, and `docs/RUNBOOK.md` before running
 experiments.
 
-The repository contains code, protocols and test fixtures. Official C-MAPSS raw files are never committed; obtain them from the source recorded in `data/registry.yaml` and verify their hashes first.
+The repository contains code, protocols and test fixtures. Official C-MAPSS raw
+files are never committed; obtain them from the source recorded in
+`data/registry.yaml` and verify their hashes first. The NASA portal currently
+lists the dataset license as unspecified; this repository does not redistribute
+the raw files.
 
 The complete C01--C08 command set and artifact-handling rules are in
-`docs/RUNBOOK.md`. Runners require a clean commit, validate frozen
-configuration values and input hashes, and refuse to overwrite an existing
-run directory.
+`docs/RUNBOOK.md`. Runners require a clean commit, validate each experiment's
+declared configuration contract and input hashes, and refuse to overwrite an
+existing run directory.
 
 
 ## Design principles
@@ -80,7 +84,9 @@ and reporting state live in [docs/protocol.md](docs/protocol.md),
 [docs/RESULTS.md](docs/RESULTS.md). The tracked Gate D builder validates the
 official artifact index and reconstructs the C01--C08 tables without manual
 transcription. The separate tracked C11 reporting path publishes only the
-verified C11 artifact. C12 remains ineligible for numerical reporting.
+verified C11 artifact. C12 remains ineligible for numerical reporting. The
+checked public-artifact archive procedure, which excludes raw C-MAPSS data, is
+documented in [docs/ARTIFACT_RELEASE.md](docs/ARTIFACT_RELEASE.md).
 
 ## Citation
 

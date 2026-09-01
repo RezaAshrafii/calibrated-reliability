@@ -19,6 +19,7 @@ def test_synthetic_registry_verification_then_loader(tmp_path: Path) -> None:
     registry.write_text(
         yaml.safe_dump(
             {
+                "version": 1,
                 "files": [
                     {
                         "filename": target.name,
@@ -28,7 +29,7 @@ def test_synthetic_registry_verification_then_loader(tmp_path: Path) -> None:
                         "expected_engines": 2,
                         "sha256": compute_sha256(target),
                     }
-                ]
+                ],
             }
         ),
         encoding="utf-8",

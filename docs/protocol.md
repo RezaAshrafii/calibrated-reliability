@@ -47,6 +47,12 @@ Official test data is never used for tuning. MALT is deferred outside the core
 study; ADR-0002 preserves the grouping rule that would apply if a separately
 reviewed future study revives it.
 
+The raw C-MAPSS files are obtained from the NASA Open Data portal recorded in
+`data/registry.yaml`, but that portal currently displays "License not
+specified." The registry's `NASA Open Data` label identifies the distribution
+source; it is not a redistribution-rights assertion. Raw data is not committed
+or redistributed by this repository.
+
 Phase 5 feature construction is fail-closed. Predictor input contains only `engine_id`, `cycle`, the three operating settings, and NASA C-MAPSS sensors `sensor_1` through `sensor_21`; targets are passed separately and are never accepted as feature columns. Temporal output may additionally contain `cycle_index`, one-cycle sensor deltas, and past-only rolling mean, population standard deviation, and least-squares slope features for configured positive windows. The fit-time column schema is enforced during transform. `engine_id` is retained only for trajectory alignment and is removed before model input. `cycle_ratio` and any feature derived from terminal trajectory length are prohibited.
 
 Operating-regime clustering and all scalers are fit on base-training rows only. A requested clustering is valid only when it realizes exactly the requested number of non-empty regimes. Single-setting or invalid-clustering cases use a deterministic global scaler and record the fallback reason in the fitted transformer.

@@ -3,7 +3,7 @@
 ## Purpose
 
 This document defines how the repository must position its completed C01-C08
-experiments and any future C11/C12 work. It is a claim-control document, not a
+and C11 experiments and any future C12 work. It is a claim-control document, not a
 systematic-review claim. The search protocol, evidence levels, and stop-rule
 decisions are recorded in `docs/NOVELTY_MATRIX.md`.
 
@@ -163,10 +163,28 @@ Not allowed:
 
 ## Execution position
 
-- C11 design work is permitted only after a dedicated ADR and independent
-  design review. Execution remains blocked until that gate passes.
+- C11 design, implementation-readiness, artifact-level, and report-level
+  reviews passed before the single authorized execution from clean commit
+  `cba16d0`. C11 is now `IMPLEMENTED / EXECUTED / VERIFIED / REPORTED`; its
+  narrow claim boundary remains unchanged.
 - C12 is secondary and conditional. It cannot precede the C11 mechanism gate,
   and it requires observation-alignment and cap-saturation controls.
 - C12-D, MALT, N-CMAPSS expansion, new deep models, and product/dashboard work
   remain outside the current core.
 
+## Post-Gate-N adjacent-source update
+
+The original Gate N corpus ended on 2026-08-28. A final adjacent-source check
+on 2026-09-01 did not change the `REFRAME` decision, but it adds two useful
+boundaries. They are not evidence of universal absence or a systematic-review
+update.
+
+- [Lospinoso (2026), *Conformal Prediction*](https://lospino.so/statistics/conformal-prediction/)
+  is a teaching resource that uses FD001 to explain engine-level calibration,
+  finite rank, and the augmented-infinity convention. It is not peer-reviewed
+  prognostics evidence, but it further rules out presenting engine units or
+  the finite-rank edge as a novel pedagogical observation.
+- [Yang, Wang, and Wang (2026)](https://arxiv.org/abs/2607.08273) study
+  empirical calibration and conditional-reliability diagnostics for bearing
+  RUL under operating-regime shift. It is an adjacent benchmark/protocol
+  precedent, not a duplicate C-MAPSS finite-reservoir study.

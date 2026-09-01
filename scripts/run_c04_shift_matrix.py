@@ -24,19 +24,12 @@ from calibrated_reliability.experiments.c04 import C04Config, run_c04_seed
 )
 @click.option("--data-root", type=click.Path(path_type=Path), default=Path("data/raw"))
 @click.option("--output-root", type=click.Path(path_type=Path), default=Path("outputs/c04"))
-@click.option(
-    "--target",
-    "requested_targets",
-    multiple=True,
-    type=click.Choice(["FD001", "FD002", "FD003", "FD004"]),
-)
 @click.option("--seed", "requested_seeds", multiple=True, type=int)
 def main(
     config_path: Path,
     registry_path: Path,
     data_root: Path,
     output_root: Path,
-    requested_targets: tuple[str, ...],
     requested_seeds: tuple[int, ...],
 ) -> None:
     """Run all declared C04 target domains and seeds."""
@@ -44,7 +37,7 @@ def main(
     if subprocess.check_output(["git", "status", "--porcelain"], text=True).strip():
         raise click.ClickException("C04 requires a clean Git worktree")
     config = C04Config.from_yaml(config_path.read_text(encoding="utf-8"))
-    targets = requested_targets or config.targets
+    targets = config.targets
     seeds = requested_seeds or config.c02.seeds
     if set(seeds) - set(config.c02.seeds):
         raise click.ClickException("Undeclared C04 seed requested")

@@ -73,7 +73,8 @@ selection, an incomplete or substituted run matrix, a dirty worktree, mixed Git
 SHAs within one official tree, a manifest-set digest mismatch, nested manifest,
 path traversal, and every manifest or artifact hash mismatch. Git state,
 environment, and official artifacts are revalidated immediately before final
-publication.
+publication. A separately indexed C11 root may co-exist under `outputs/`; it is
+strictly verified but never contributes Gate D C01--C08 rows.
 
 The canonical C11 publication is under `reports/c11/` and must not be
 overwritten. Exact reconstruction of all C11 report files requires the recorded

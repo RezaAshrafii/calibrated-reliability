@@ -25,6 +25,10 @@ from calibrated_reliability.evaluation.conformal import (
     interval_metrics,
 )
 from calibrated_reliability.evaluation.metrics import rul_metrics
+from calibrated_reliability.reporting.c11_results import (
+    indexed_artifact_root,
+    verify_c11_artifact,
+)
 
 ArtifactStatus = Literal["OFFICIAL", "SUPERSEDED"]
 PENDING = "PENDING"
@@ -298,15 +302,30 @@ def load_artifact_index(index_path: Path) -> ArtifactIndex:
 
 
 def _validate_tree_inventory(repository_root: Path, index: ArtifactIndex) -> None:
+    """Require Gate D roots plus any separately indexed C11 root to be explicit."""
     outputs = repository_root / "outputs"
     actual = {
         path.relative_to(repository_root).as_posix() for path in outputs.iterdir() if path.is_dir()
     }
     indexed = {entry.path for entry in index.entries}
-    if actual != indexed:
+    separately_indexed: set[str] = set()
+    c11_index_path = repository_root / "docs" / "c11_artifact_index.yaml"
+    if c11_index_path.is_file():
+        c11_root = indexed_artifact_root(c11_index_path)
+        c11_path = repository_root / c11_root
+        if c11_path.exists():
+            if not c11_path.is_dir() or c11_path.is_symlink():
+                raise ValueError("Separately indexed C11 root must be a regular directory")
+            _, run_dir = verify_c11_artifact(repository_root, c11_index_path)
+            if run_dir.parent.resolve() != c11_path.resolve():
+                raise ValueError("Separately indexed C11 run escapes its declared root")
+            separately_indexed.add(c11_root)
+    unindexed = actual - indexed - separately_indexed
+    missing = indexed - actual
+    if unindexed or missing:
         raise ValueError(
             "Artifact-tree inventory differs from the tracked index; "
-            f"unindexed={sorted(actual - indexed)}, missing={sorted(indexed - actual)}"
+            f"unindexed={sorted(unindexed)}, missing={sorted(missing)}"
         )
 
 

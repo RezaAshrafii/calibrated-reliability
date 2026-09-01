@@ -2,8 +2,9 @@
 
 ## Status
 
-Accepted; implemented, executed, and independently verified. Numerical
-reporting remains pending Gate D.
+Historical status at this decision checkpoint: accepted, implemented, executed,
+and independently verified; numerical reporting remained pending Gate D.
+Current lifecycle status is maintained in `docs/experiment_registry.md`.
 
 ## Decision
 

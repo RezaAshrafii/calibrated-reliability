@@ -2,8 +2,10 @@
 
 ## Status
 
-Accepted; implemented, executed, and independently verified as bounded-weight
-exploratory/appendix evidence. Numerical reporting remains pending Gate D.
+Historical status at this decision checkpoint: accepted, implemented, executed,
+and independently verified as bounded-weight exploratory/appendix evidence;
+numerical reporting remained pending Gate D. Current lifecycle status is
+maintained in `docs/experiment_registry.md`.
 
 ## Decision
 

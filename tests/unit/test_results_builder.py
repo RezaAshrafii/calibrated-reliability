@@ -218,6 +218,26 @@ def test_unindexed_artifact_tree_fails_closed(tmp_path: Path) -> None:
         results.verify_indexed_artifacts(repository, results.load_artifact_index(index_path))
 
 
+def test_separately_indexed_c11_root_is_not_an_unindexed_gate_d_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, index_path = _fixture_repository(tmp_path)
+    c11_root = repository / "outputs" / "c11_final"
+    c11_root.mkdir()
+    c11_index = repository / "docs" / "c11_artifact_index.yaml"
+    c11_index.parent.mkdir()
+    c11_index.write_text("placeholder\n", encoding="utf-8")
+
+    monkeypatch.setattr(results, "indexed_artifact_root", lambda _: "outputs/c11_final")
+    monkeypatch.setattr(results, "verify_c11_artifact", lambda *_: ({}, c11_root / "run"))
+    (c11_root / "run").mkdir()
+
+    verified = results.verify_indexed_artifacts(
+        repository, results.load_artifact_index(index_path)
+    )
+    assert len(verified) == 8
+
+
 def test_missing_declared_artifact_fails_closed(tmp_path: Path) -> None:
     repository, index_path = _fixture_repository(tmp_path)
     missing = repository / "outputs" / "c01_official" / "run" / "predictions.csv"

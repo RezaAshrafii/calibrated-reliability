@@ -1,4 +1,4 @@
-"""Behavioral tests for the non-executed C11 implementation checkpoint."""
+"""Behavioral tests for the frozen C11 finite-reservoir contract."""
 
 from __future__ import annotations
 

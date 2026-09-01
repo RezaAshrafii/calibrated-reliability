@@ -64,4 +64,6 @@ implemented and remains ineligible for reporting.
 Raw data and generated outputs are intentionally excluded from Git. Their
 absence from a clean clone means local data and artifact verification is not a
 CI claim. Reproducibility depends on the registered hashes, immutable manifests,
-and a durable external archive of the final official artifact trees.
+and a durable external archive of the final official artifact trees. Build and
+validate that raw-data-free archive only with the procedure in
+`docs/ARTIFACT_RELEASE.md`.

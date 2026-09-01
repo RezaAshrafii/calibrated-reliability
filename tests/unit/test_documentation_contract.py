@@ -106,6 +106,7 @@ def test_gate_d_builder_and_artifact_index_are_the_only_reporting_path() -> None
     assert "deterministically reported" in readme
     assert "scripts/build_results.py" in runbook
     assert "docs/artifact_index.yaml" in runbook
+    assert "separately indexed C11 root" in runbook
     for experiment_id in range(1, 9):
         assert f"experiment_id: C{experiment_id:02d}" in index
     assert index.count("status: OFFICIAL") == 8

@@ -3,7 +3,8 @@
 ## Status
 
 - Gate: N (novelty before C11/C12)
-- Search cut-off: 2026-08-28
+- Gate N search cut-off: 2026-08-28
+- Final adjacent-source update: 2026-09-01 (not a systematic re-search)
 - Decision: **REFRAME**
 - Scope: C-MAPSS RUL interval reliability, conformal calibration under shift,
   calibration-size effects, and the proposed C11/C12 extensions
@@ -11,7 +12,9 @@
   negative statement below means only "not found in the searched corpus by the
   cut-off date."
 
-No C11 or C12 implementation or artifact was produced during this gate.
+No C11 or C12 implementation or artifact was produced during Gate N. Later
+C11 work followed its separately reviewed design, implementation-readiness,
+execution, artifact, and reporting gates.
 
 ## Decision in one paragraph
 
@@ -40,6 +43,12 @@ All searches were run on 2026-08-28. Domain-constrained web search was used
 when a database did not expose a usable anonymous API. This distinction is
 recorded because a domain-constrained web result is weaker evidence than a
 complete native-database export.
+
+On 2026-09-01, a final targeted adjacent-source update inspected an FD001
+engine-level conformal teaching resource and an arXiv bearing-RUL
+conditional-reliability study. The update did not repeat every original query,
+so all original negative statements remain bounded to the 2026-08-28 Gate N
+corpus.
 
 | System | Exact queries or endpoint | Access result | Evidence retained |
 |---|---|---|---|
@@ -75,6 +84,8 @@ not established.
 | W11 | Yan (2026), [Zenodo 10.5281/zenodo.21330745](https://doi.org/10.5281/zenodo.21330745), **code + artifacts** | C-MAPSS FD001-FD004 and N-CMAPSS; split, CV+, ACI, regime ACI, Mondrian, CQR; multiple predictors; calibration-fraction and regime-count sweeps; per-engine artifacts | Explicit finite-rank attainability boundary; unattainable-rank frequency; fail-closed or infinite-rank policy. The inspected helper clamps the requested index to the largest observed score | Closest empirical competitor. It pre-empts broad ACI/regime/calibration-budget claims but does not trigger the exact attainability stop rule. |
 | W12 | Xu et al. (2026), [DOI 10.1016/j.ress.2026.112763](https://doi.org/10.1016/j.ress.2026.112763), **publisher abstract/highlights** | RUL uncertainty quantification plus split conformal on C-MAPSS and batteries | Engine-level rank boundary and C-MAPSS calibration mechanism | Adjacent recent RUL-calibration work; do not overstate details not available in the inspected abstract. |
 | W13 | Same-template shift studies, [arXiv:2605.18008](https://arxiv.org/abs/2605.18008), [arXiv:2607.17405](https://arxiv.org/abs/2607.17405), [arXiv:2603.24475](https://arxiv.org/abs/2603.24475), and [arXiv:2510.05566](https://arxiv.org/abs/2510.05566), **abstract-level** | External/structured shift audits followed by post-hoc conformal assessment or repair in blood pressure, transcriptomics, batteries, and language models | Turbofan-specific observation and engine-budget mechanism | Establishes that the broad "audit under shift then repair" template is not novel. |
+| W14 | [Lospinoso (2026)](https://lospino.so/statistics/conformal-prediction/), **teaching page** | FD001 as a teaching dataset; engines as calibration units; finite-rank augmented-infinity edge | Peer-reviewed prognostics mechanism evidence; C-MAPSS finite-reservoir audit | Pedagogical adjacency only; do not treat it as proof against the narrow C11 mechanism contribution. |
+| W15 | Yang, Wang, and Wang (2026), [arXiv:2607.08273](https://arxiv.org/abs/2607.08273), **abstract-level** | RUL reliability under operating-regime shift; empirical calibration and conditional diagnostics on bearings | C-MAPSS finite-reservoir rank accounting; exact Beta comparison | Adjacent reliability-evaluation template; do not claim the broad protocol is unique. |
 
 ## Claim-by-claim decision
 
