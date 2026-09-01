@@ -9,6 +9,10 @@ RUL_FD001.txt   ... RUL_FD004.txt
 ```
 
 Source: [NASA C-MAPSS Open Data](https://data.nasa.gov/dataset/cmapss-jet-engine-simulated-data).
+The portal currently reports the dataset license as "License not specified."
+The historical `license: "NASA Open Data"` registry value identifies the NASA
+Open Data distribution portal and does not assert redistribution rights. This
+repository does not redistribute the raw files.
 
 Run verification from the repository root:
 
@@ -17,4 +21,3 @@ uv run python scripts/verify_data.py --registry data/registry.yaml
 ```
 
 The verifier is fail-closed: missing files, changed bytes, changed SHA-256, wrong row counts, wrong engine counts, and malformed 26-column files fail with exit code 1.
-

@@ -14,10 +14,17 @@ uv run python scripts/build_official_artifact_archive.py \
 
 The destination must be a new absolute ZIP path outside the repository. The
 builder verifies the Gate D official roots and the separately indexed C11
-artifact before writing anything. It includes only verified official artifact
-roots, the two artifact indices, tracked reports, frozen configurations,
-registry metadata, lockfile, and decision records. It rejects symlinks and
-never includes `data/raw/`.
+artifact before writing anything. From the official roots it includes only
+manifest-declared artifacts; metadata is selected only from Git-tracked files.
+The remaining content is the two artifact indices, tracked reports, frozen
+configurations, registry metadata, lockfile, and decision records. It rejects
+symlinks and never includes `data/raw/`.
+
+Immediately before publication, the builder revalidates both artifact indices,
+all source hashes, the exact input set, and the clean Git revision. It then
+reopens the completed ZIP and verifies its exact member list, byte counts, and
+SHA-256 values before the atomic rename. Existing destinations cannot be
+overwritten and failed builds remove their temporary directory.
 
 `ARCHIVE_MANIFEST.json` inside the ZIP records every included file's relative
 path, byte count, SHA-256, current clean builder SHA, C11 producing SHA, and

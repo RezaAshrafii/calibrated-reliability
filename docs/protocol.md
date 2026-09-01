@@ -66,8 +66,9 @@ provided by NASA with unobserved future trajectories and a separate RUL file.
 Differences among domain, observed-cycle horizon, degradation stage, and
 cap-saturation frequency can therefore be entangled. C04--C08 are benchmark
 evaluations under these declared mechanisms, not ordinary-exchangeability
-coverage guarantees. Any future C11/C12 interpretation must treat this mismatch
-as a measured diagnostic or limitation rather than an established cause.
+coverage guarantees. The completed C11 interpretation and any future C12
+interpretation must treat this mismatch as a measured diagnostic or limitation
+rather than an established cause.
 
 C01 is a cycle-weighted point-baseline experiment: every observed base-training cycle contributes one training row, while evaluation uses exactly one final observed endpoint per official FD001 test engine. It uses past-only temporal features without regime clustering or regime-aware scaling; those methods are reserved for C07. Both training targets and endpoint targets are capped at 125. Raw targets and raw predictions are retained for audit, but primary C01 metrics use targets and predictions clipped to the preregistered support `[0, 125]`. Signed error is defined as `prediction - target`, so positive values indicate overprediction. These choices are fixed in ADR-0003 and the executable C01 configuration.
 
